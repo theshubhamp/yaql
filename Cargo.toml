@@ -3,4 +3,9 @@ name = "yaql"
 version = "0.1.0"
 edition = "2021"
 
+[build-dependencies] # <-- We added this and everything after!
+lalrpop = "0.19.7"
+
 [dependencies]
+lalrpop-util = { version = "0.19.7", features = ["lexer"] }
+regex = "1"
