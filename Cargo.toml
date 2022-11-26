@@ -1,3 +1,6 @@
+[workspace]
+members = ["."]
+
 [package]
 name = "yaql"
 version = "0.1.0"
@@ -9,3 +12,4 @@ lalrpop = "0.19.7"
 [dependencies]
 lalrpop-util = { version = "0.19.7", features = ["lexer"] }
 regex = "1"
+serde_json = "1.0.91"

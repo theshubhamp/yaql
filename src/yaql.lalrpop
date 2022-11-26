@@ -1,10 +1,88 @@
 use std::str::FromStr;
+use crate::ast::{Value};
 
 grammar;
 
-pub Term: i32 = {
-    <n:Num> => n,
-    "(" <t:Term> ")" => t,
-};
+match {
+    r"(|)" => RoundBrackets,
+    r"[|]" => SquareBrackets,
+    r"\{|\}" => CurlyBrackets,
+    r"-?[0-9]+(.[0-9]+)?" => Number,
+    r"'([^'\\\\]|\\\\.)*'" => SingleQuotedString,
+    r##""([^"\\\\]|\\\\.)*""## => DoubleQuotedString,
+    "true" => True,
+    "false" => False,
+    "null" => Null,
+    r"\$\w*" => Dollar,
+    r"=>" => MappingArrow,
+    r"\w+\(" => FunctionName,
+    _
+}
 
-Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+pub Value: Value = {
+    "(" <v:Atom> ")" => v,
+    <l:Atom> "." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), ".".to_string(), Box::new(r)),
+    <l:Atom> "?." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), "?.".to_string(), Box::new(r)),
+    ComparisonP1,
+}
+
+ComparisonP1: Value = {
+    <l:ComparisonP1> "and" <r:ComparisonP2> => Value::BinaryOperator(Box::new(l), "and".to_string(), Box::new(r)),
+    <l:ComparisonP1> "or" <r:ComparisonP2> => Value::BinaryOperator(Box::new(l), "or".to_string(), Box::new(r)),
+    <l:ComparisonP1> "->" <r:ComparisonP2> => Value::BinaryOperator(Box::new(l), "->".to_string(), Box::new(r)),
+    ComparisonP2
+}
+
+ComparisonP2: Value = {
+    <l:ComparisonP2> ">" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), ">".to_string(), Box::new(r)),
+    <l:ComparisonP2> "<" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), "<".to_string(), Box::new(r)),
+    <l:ComparisonP2> ">=" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), ">=".to_string(), Box::new(r)),
+    <l:ComparisonP2> "<=" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), "<=".to_string(), Box::new(r)),
+    <l:ComparisonP2> "!=" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), "!=".to_string(), Box::new(r)),
+    <l:ComparisonP2> "=" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), "=".to_string(), Box::new(r)),
+    <l:ComparisonP2> "in" <r:ComparisonP3> => Value::BinaryOperator(Box::new(l), "in".to_string(), Box::new(r)),
+    ComparisonP3,
+}
+
+ComparisonP3: Value = {
+    <l:ComparisonP3> "+" <r:ComparisonP4> => Value::BinaryOperator(Box::new(l), "+".to_string(), Box::new(r)),
+    <l:ComparisonP3> "-" <r:ComparisonP4> => Value::BinaryOperator(Box::new(l), "-".to_string(), Box::new(r)),
+    ComparisonP4,
+}
+
+ComparisonP4: Value = {
+    <l:ComparisonP4> "*" <r:ComparisonP5> => Value::BinaryOperator(Box::new(l), "*".to_string(), Box::new(r)),
+    <l:ComparisonP4> "/" <r:ComparisonP5> => Value::BinaryOperator(Box::new(l), "/".to_string(), Box::new(r)),
+    <l:ComparisonP4> "mod" <r:ComparisonP5> => Value::BinaryOperator(Box::new(l), "mod".to_string(), Box::new(r)),
+    ComparisonP5,
+}
+
+ComparisonP5: Value = {
+    <l:ComparisonP5> "=~" <r:Atom> => Value::BinaryOperator(Box::new(l), "=~".to_string(), Box::new(r)),
+    <l:ComparisonP5> "!~" <r:Atom> => Value::BinaryOperator(Box::new(l), "!~".to_string(), Box::new(r)),
+    Atom,
+}
+
+Atom: Value = {
+    Number => Value::NumberLiteral(f64::from_str(<>).unwrap()),
+    SingleQuotedString => Value::StringLiteral(<>.to_string()),
+    DoubleQuotedString => Value::StringLiteral(<>.to_string()),
+    True => Value::BooleanLiteral(true),
+    False => Value::BooleanLiteral(false),
+    Null => Value::NullLiteral,
+    Dollar => Value::Dollar(<>.strip_prefix("$").unwrap().to_string()),
+    <f:FunctionName> <args:Comma<Value>> <kwargs:Comma<Mapping>> ")" => Value::FunctionCall(f.strip_suffix("(").unwrap().to_string(), args, kwargs),
+}
+
+Mapping: (Value, Value) = {
+    <f:Value> MappingArrow <t:Value> => (f, t)
+}
+
+#[inline]
+Comma<T>: Vec<T> = {
+    <items: (<T> ",")*> <last: T?> => {
+        let mut items = items;
+        items.extend(last);
+        items
+    }
+};
