@@ -6,4 +6,3 @@
 # Rust
 /target
 /macros/target
-Cargo.lock
