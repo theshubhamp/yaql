@@ -6,3 +6,7 @@
 # Rust
 /target
 /macros/target
+
+# Python (harness venv)
+.venv/
+__pycache__/
