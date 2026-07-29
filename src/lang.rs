@@ -6,7 +6,7 @@ pub enum Primitive {
     Number(f64),
     Boolean(bool),
     Array(Vec<Primitive>),
-    Map(HashMap<Primitive, Primitive>),
+    Map(HashMap<String, Primitive>),
     Null,
 }
 
