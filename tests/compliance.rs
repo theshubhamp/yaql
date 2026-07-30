@@ -250,6 +250,13 @@ compliance_cases! {
     case_branch_examine: "examine($ < 10, $ > 5)", json!(1);
     case_branch_examine_mid: "examine($ < 10, $ > 5)", json!(7);
     case_branch_examine_high: "examine($ < 10, $ > 5)", json!(12);
+    // --- logical operators (not) ---
+    case_bool_not_true: "not true", Value::Null;
+    case_bool_not_false: "not false", Value::Null;
+    case_bool_not_zero: "not 0", Value::Null;
+    case_bool_not_num: "not 123", Value::Null;
+    case_bool_not_empty_str: "not ''", Value::Null;
+    case_bool_not_null: "not null", Value::Null;
 }
 
 ignored_compliance_cases! {
@@ -297,12 +304,6 @@ ignored_compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
-    case_bool_not_true: "not true", Value::Null;
-    case_bool_not_false: "not false", Value::Null;
-    case_bool_not_zero: "not 0", Value::Null;
-    case_bool_not_num: "not 123", Value::Null;
-    case_bool_not_empty_str: "not ''", Value::Null;
-    case_bool_not_null: "not null", Value::Null;
     case_bool_is_boolean_true: "isBoolean(true)", Value::Null;
     case_bool_is_boolean_false: "isBoolean(false)", Value::Null;
     case_bool_is_boolean_num: "isBoolean(123)", Value::Null;

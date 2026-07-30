@@ -11,7 +11,7 @@ fn interpret_string() {
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
     match result {
         Primitive::String(string) => {
-            assert_eq!(string, "'string'");
+            assert_eq!(string, "string");
         }
         _ => panic!("expected String"),
     }

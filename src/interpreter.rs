@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::ast::{Value, Visitor};
-use crate::lang::{BINARY_OPERATORS, FUNCTIONS, Primitive};
+use crate::lang::{truthy, BINARY_OPERATORS, FUNCTIONS, Primitive};
 
 pub struct Interpreter {
     pub context: Primitive,
@@ -16,12 +16,12 @@ impl Visitor<Option<Primitive>> for Interpreter {
             Value::Dollar(path) => self.visit_dollar(path),
             Value::FunctionCall(identifier, args, kwargs) => self.visit_function_call(identifier, args, kwargs),
             Value::BinaryOperator(left, op, right) => self.visit_binary_operator(*left, op, *right),
-            Value::UnaryOperator(_, _) => {todo!()}
+            Value::UnaryOperator(op, operand) => self.visit_unary_operator(op, *operand),
         }
     }
 
     fn visit_string_literal(&self, string: String) -> Option<Primitive> {
-        return Some(Primitive::String(string));
+        return Some(Primitive::String(unquote(&string)));
     }
 
     fn visit_number_literal(&self, num: f64) -> Option<Primitive> {
@@ -70,5 +70,34 @@ impl Visitor<Option<Primitive>> for Interpreter {
         let right_value = right_value.unwrap();
 
         return Some(BINARY_OPERATORS.lookup(op)(left_value, right_value));
+    }
+
+    fn visit_unary_operator(&self, op: String, operand: Value) -> Option<Primitive> {
+        let val = self.visit(operand)?;
+        match op.as_str() {
+            "not" => Some(Primitive::Boolean(!truthy(&val))),
+            _ => None,
+        }
+    }
+}
+
+fn unquote(raw: &str) -> String {
+    if raw.len() < 2 {
+        return raw.to_string();
+    }
+    let quote = raw.chars().next().unwrap();
+    let inner = &raw[1..raw.len() - 1];
+    if quote == '`' {
+        // Verbatim: only \` is escaped, everything else is literal.
+        inner.replace("\\`", "`")
+    } else if quote == '\'' {
+        // Single-quoted: same escapes as JSON strings, plus \'.
+        // Convert \' to ' then parse as a JSON string (wrapped in double quotes).
+        let json_str = format!("\"{}\"", inner.replace("\\'", "'"));
+        serde_json::from_str::<String>(&json_str).unwrap_or_else(|_| inner.to_string())
+    } else {
+        // Double-quoted: already JSON-compatible.
+        let json_str = format!("\"{}\"", inner);
+        serde_json::from_str::<String>(&json_str).unwrap_or_else(|_| inner.to_string())
     }
 }

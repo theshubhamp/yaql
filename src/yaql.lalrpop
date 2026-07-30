@@ -8,11 +8,13 @@ match {
     r"[|]" => SquareBrackets,
     r"\{|\}" => CurlyBrackets,
     r"-?[0-9]+(.[0-9]+)?" => Number,
-    r"'([^'\\\\]|\\\\.)*'" => SingleQuotedString,
-    r##""([^"\\\\]|\\\\.)*""## => DoubleQuotedString,
+    r"'([^'\\]|\\.)*'" => SingleQuotedString,
+    r##""([^"\\]|\\.)*""## => DoubleQuotedString,
+    r"`([^`\\]|\\.)*`" => BacktickString,
     "true" => True,
     "false" => False,
     "null" => Null,
+    "not" => Not,
     r"\$\w*" => Dollar,
     r"=>" => MappingArrow,
     r"\w+\(" => FunctionName,
@@ -64,9 +66,11 @@ ComparisonP5: Value = {
 }
 
 Atom: Value = {
+    Not <v:Atom> => Value::UnaryOperator("not".to_string(), Box::new(v)),
     Number => Value::NumberLiteral(f64::from_str(<>).unwrap()),
     SingleQuotedString => Value::StringLiteral(<>.to_string()),
     DoubleQuotedString => Value::StringLiteral(<>.to_string()),
+    BacktickString => Value::StringLiteral(<>.to_string()),
     True => Value::BooleanLiteral(true),
     False => Value::BooleanLiteral(false),
     Null => Value::NullLiteral,

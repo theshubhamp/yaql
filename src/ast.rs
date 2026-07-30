@@ -23,4 +23,5 @@ pub trait Visitor<T> {
     fn visit_dollar(&self, path: String) -> T;
     fn visit_function_call(&self, identifier: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> T;
     fn visit_binary_operator(&self, left: Value, op: String, right: Value) -> T;
+    fn visit_unary_operator(&self, op: String, operand: Value) -> T;
 }
