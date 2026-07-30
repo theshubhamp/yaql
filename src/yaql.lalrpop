@@ -7,7 +7,7 @@ match {
     r"(|)" => RoundBrackets,
     r"[|]" => SquareBrackets,
     r"\{|\}" => CurlyBrackets,
-    r"-?[0-9]+(.[0-9]+)?" => Number,
+    r"-?[0-9]+(\.[0-9]+)?" => Number,
     r"'([^'\\]|\\.)*'" => SingleQuotedString,
     r##""([^"\\]|\\.)*""## => DoubleQuotedString,
     r"`([^`\\]|\\.)*`" => BacktickString,
@@ -18,11 +18,11 @@ match {
     r"\$\w*" => Dollar,
     r"=>" => MappingArrow,
     r"\w+\(" => FunctionName,
+    r"[a-zA-Z_][a-zA-Z0-9_]*" => Identifier,
     _
 }
 
 pub Value: Value = {
-    "(" <v:Atom> ")" => v,
     <l:Atom> "." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), ".".to_string(), Box::new(r)),
     <l:Atom> "?." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), "?.".to_string(), Box::new(r)),
     ComparisonP1,
@@ -67,13 +67,19 @@ ComparisonP5: Value = {
 
 Atom: Value = {
     Not <v:Atom> => Value::UnaryOperator("not".to_string(), Box::new(v)),
-    Number => Value::NumberLiteral(f64::from_str(<>).unwrap()),
+    "(" <v:Value> ")" => v,
+    <n:Number> => if n.contains('.') {
+        Value::FloatLiteral(f64::from_str(n).unwrap())
+    } else {
+        Value::IntLiteral(i64::from_str(n).unwrap())
+    },
     SingleQuotedString => Value::StringLiteral(<>.to_string()),
     DoubleQuotedString => Value::StringLiteral(<>.to_string()),
     BacktickString => Value::StringLiteral(<>.to_string()),
     True => Value::BooleanLiteral(true),
     False => Value::BooleanLiteral(false),
     Null => Value::NullLiteral,
+    Identifier => Value::StringLiteral(<>.to_string()),
     Dollar => Value::Dollar(<>.strip_prefix("$").unwrap().to_string()),
     <f:FunctionName> <args:Comma<Value>> <kwargs:Comma<Mapping>> ")" => Value::FunctionCall(f.strip_suffix("(").unwrap().to_string(), args, kwargs),
 }

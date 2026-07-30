@@ -10,7 +10,8 @@ impl Visitor<Option<Primitive>> for Interpreter {
     fn visit(&self, value: Value) -> Option<Primitive> {
         return match value {
             Value::StringLiteral(string) => self.visit_string_literal(string),
-            Value::NumberLiteral(num) => self.visit_number_literal(num),
+            Value::IntLiteral(num) => self.visit_int_literal(num),
+            Value::FloatLiteral(num) => self.visit_float_literal(num),
             Value::BooleanLiteral(bool) => self.visit_boolean_literal(bool),
             Value::NullLiteral => self.visit_null_literal(),
             Value::Dollar(path) => self.visit_dollar(path),
@@ -24,8 +25,12 @@ impl Visitor<Option<Primitive>> for Interpreter {
         return Some(Primitive::String(unquote(&string)));
     }
 
-    fn visit_number_literal(&self, num: f64) -> Option<Primitive> {
-        return Some(Primitive::Number(num));
+    fn visit_int_literal(&self, num: i64) -> Option<Primitive> {
+        return Some(Primitive::Int(num));
+    }
+
+    fn visit_float_literal(&self, num: f64) -> Option<Primitive> {
+        return Some(Primitive::Float(num));
     }
 
     fn visit_boolean_literal(&self, bool: bool) -> Option<Primitive> {
@@ -76,6 +81,12 @@ impl Visitor<Option<Primitive>> for Interpreter {
         let val = self.visit(operand)?;
         match op.as_str() {
             "not" => Some(Primitive::Boolean(!truthy(&val))),
+            "-" => match val {
+                Primitive::Int(n) => Some(Primitive::Int(-n)),
+                Primitive::Float(n) => Some(Primitive::Float(-n)),
+                _ => None,
+            },
+            "+" => Some(val),
             _ => None,
         }
     }
@@ -85,12 +96,17 @@ fn unquote(raw: &str) -> String {
     if raw.len() < 2 {
         return raw.to_string();
     }
-    let quote = raw.chars().next().unwrap();
+    let first = raw.chars().next().unwrap();
+    let last = raw.chars().last().unwrap();
+    // Only process if surrounded by matching quote characters.
+    if !((first == '\'' || first == '"' || first == '`') && first == last) {
+        return raw.to_string();
+    }
     let inner = &raw[1..raw.len() - 1];
-    if quote == '`' {
+    if first == '`' {
         // Verbatim: only \` is escaped, everything else is literal.
         inner.replace("\\`", "`")
-    } else if quote == '\'' {
+    } else if first == '\'' {
         // Single-quoted: same escapes as JSON strings, plus \'.
         // Convert \' to ' then parse as a JSON string (wrapped in double quotes).
         let json_str = format!("\"{}\"", inner.replace("\\'", "'"));

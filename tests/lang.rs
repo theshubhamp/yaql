@@ -26,10 +26,10 @@ fn interpret_number() {
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
     match result {
-        Primitive::Number(num) => {
+        Primitive::Float(num) => {
             assert_eq!(num, 4.2);
         }
-        _ => panic!("expected Number"),
+        _ => panic!("expected Float"),
     }
 
     return;
@@ -81,9 +81,9 @@ fn interpret_dollar() {
     let parse_result = ValueParser::new().parse("$");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Number(12.0) }.visit(ast).unwrap();
+    let result = Interpreter{ context: Primitive::Int(12) }.visit(ast).unwrap();
     match result {
-        Primitive::Number(num) => assert_eq!(num, 12.0),
+        Primitive::Int(num) => assert_eq!(num, 12),
         _ => panic!("expected Null"),
     }
 

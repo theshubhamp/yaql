@@ -38,7 +38,7 @@ fn interpret_and() {
     let parse_result = ValueParser::new().parse("true and 12");
     let ast = parse_result.unwrap();
     match interpreter.visit(ast).unwrap() {
-        Primitive::Number(num) => assert_eq!(num, 12.0),
+        Primitive::Int(num) => assert_eq!(num, 12),
         _ => panic!("expected Number"),
     }
 
@@ -85,7 +85,7 @@ fn interpret_or() {
     let parse_result = ValueParser::new().parse("12 or true");
     let ast = parse_result.unwrap();
     match interpreter.visit(ast).unwrap() {
-        Primitive::Number(num) => assert_eq!(num, 12.0),
+        Primitive::Int(num) => assert_eq!(num, 12),
         _ => panic!("expected Number"),
     }
 

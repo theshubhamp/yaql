@@ -227,7 +227,7 @@ compliance_cases! {
     case_switch_high: "switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)", json!(123);
     case_switch_mid: "switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)", json!(50);
     case_switch_low: "switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)", json!(-123);
-    case_math_mul_neg_neg: "-3 * -2", Value::Null;
+
     case_math_gt: "5 > 3", Value::Null;
     case_math_lt: "3 < 5", Value::Null;
     case_math_lt_float: "2.5 < 3", Value::Null;
@@ -257,9 +257,24 @@ compliance_cases! {
     case_bool_not_num: "not 123", Value::Null;
     case_bool_not_empty_str: "not ''", Value::Null;
     case_bool_not_null: "not null", Value::Null;
-}
-
-ignored_compliance_cases! {
+    // --- boolean type checks ---
+    case_bool_is_boolean_true: "isBoolean(true)", Value::Null;
+    case_bool_is_boolean_false: "isBoolean(false)", Value::Null;
+    case_bool_is_boolean_num: "isBoolean(123)", Value::Null;
+    // --- branching (coalesce, selectAllCases) ---
+    case_branch_select_all_cases: "selectAllCases($ < 10, $ > 5)", json!(1);
+    case_branch_select_all_cases_mid: "selectAllCases($ < 10, $ > 5)", json!(7);
+    case_branch_select_all_cases_high: "selectAllCases($ < 10, $ > 5)", json!(12);
+    case_branch_coalesce_null: "coalesce($, 2)", json!(null);
+    case_branch_coalesce_val: "coalesce($, 2)", json!(1);
+    // --- common (null ordering, max, min, bare identifiers) ---
+    case_common_null_lte: "null <= null", Value::Null;
+    case_common_null_gte: "null >= null", Value::Null;
+    case_common_max: "max(1, 5)", Value::Null;
+    case_common_max_null: "max(null, -1)", Value::Null;
+    case_common_min: "min(1, 5)", Value::Null;
+    case_common_str_true: "True", Value::Null;
+    case_common_str_quoted: "'some string'", Value::Null;
     // --- upstream test_math.py ---
     case_math_plus_int: "2 + 3", Value::Null;
     case_math_plus_float: "2 + 3.0", Value::Null;
@@ -278,6 +293,21 @@ ignored_compliance_cases! {
     case_math_mod_float: "9.0 mod 5", Value::Null;
     case_math_mod_float2: "9 mod 5.0", Value::Null;
     case_math_brackets: "1 - (2 - 3)", Value::Null;
+    // --- upstream test_strings.py ---
+    case_str_scalar_escape: "'some \\ttext'", Value::Null;
+    case_str_scalar_backslash: "'\\\\'", Value::Null;
+    case_str_verbatim: "`c:\\f\\x`", Value::Null;
+    case_str_verbatim_backtick: "`\\``", Value::Null;
+    case_str_verbatim_newline: "`\\n`", Value::Null;
+    case_str_eq: "a = a", Value::Null;
+    case_str_neq: "a != b", Value::Null;
+    case_str_min: "min(a, z)", Value::Null;
+}
+
+
+ignored_compliance_cases! {
+    // --- reference CLI rejects leading-dash positional args ---
+    case_math_mul_neg_neg: "-3 * -2", Value::Null;
     case_math_unary_minus: "-4", Value::Null;
     case_math_unary_minus_float: "-12.0", Value::Null;
     case_math_unary_plus: "+4", Value::Null;
@@ -304,34 +334,9 @@ ignored_compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
-    case_bool_is_boolean_true: "isBoolean(true)", Value::Null;
-    case_bool_is_boolean_false: "isBoolean(false)", Value::Null;
-    case_bool_is_boolean_num: "isBoolean(123)", Value::Null;
-    // --- upstream test_common.py ---
-    case_common_null_eq: "null = null", Value::Null;
-    case_common_null_lte: "null <= null", Value::Null;
-    case_common_null_gte: "null >= null", Value::Null;
-    case_common_max: "max(1, 5)", Value::Null;
-    case_common_max_null: "max(null, -1)", Value::Null;
-    case_common_min: "min(1, 5)", Value::Null;
-    case_common_str_true: "True", Value::Null;
-    case_common_str_quoted: "'some string'", Value::Null;
-    case_branch_select_all_cases: "selectAllCases($ < 10, $ > 5)", json!(1);
-    case_branch_select_all_cases_mid: "selectAllCases($ < 10, $ > 5)", json!(7);
-    case_branch_select_all_cases_high: "selectAllCases($ < 10, $ > 5)", json!(12);
-    case_branch_coalesce_null: "coalesce($, 2)", json!(null);
-    case_branch_coalesce_val: "coalesce($, 2)", json!(1);
-    // --- upstream test_strings.py ---
-    case_str_scalar_escape: "'some \\ttext'", Value::Null;
-    case_str_scalar_backslash: "'\\\\'", Value::Null;
-    case_str_verbatim: "`c:\\f\\x`", Value::Null;
-    case_str_verbatim_backtick: "`\\``", Value::Null;
-    case_str_verbatim_newline: "`\\n`", Value::Null;
     case_str_len: "len(abc)", Value::Null;
     case_str_to_upper: "qq.toUpper()", Value::Null;
     case_str_to_lower: "QQ.toLower()", Value::Null;
-    case_str_eq: "a = a", Value::Null;
-    case_str_neq: "a != b", Value::Null;
     case_str_is_string: "isString(abc)", Value::Null;
     case_str_is_string_null: "isString(null)", Value::Null;
     case_str_is_string_num: "isString(123)", Value::Null;
@@ -349,7 +354,6 @@ ignored_compliance_cases! {
     case_str_starts_with: "ABC.startsWith(A)", Value::Null;
     case_str_ends_with: "ABC.endsWith(C)", Value::Null;
     case_str_max: "max(a, z)", Value::Null;
-    case_str_min: "min(a, z)", Value::Null;
     case_str_to_char_array: "abc.toCharArray()", Value::Null;
     case_str_is_empty: "isEmpty('')", Value::Null;
     case_str_is_empty_null: "isEmpty(null)", Value::Null;

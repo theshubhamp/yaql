@@ -7,49 +7,49 @@ use yaql::yaql::ValueParser;
 fn interpret_switch() {
     let parse_result = ValueParser::new().parse("switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(123.0) };
+    let interpreter = Interpreter { context: Primitive::Int(123) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 3.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 3));
 
     let parse_result = ValueParser::new().parse("switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(50.0) };
+    let interpreter = Interpreter { context: Primitive::Int(50) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 2.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 2));
 
     let parse_result = ValueParser::new().parse("switch($ < 10 => 1, $ >= 10 and $ < 100 => 2, $ >= 100 => 3)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(-123.0) };
+    let interpreter = Interpreter { context: Primitive::Int(-123) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 1.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 1));
 }
 
 #[test]
 fn interpret_select_case() {
     let parse_result = ValueParser::new().parse("selectCase($ < 10, $ >= 10 and $ < 100)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(123.0) };
+    let interpreter = Interpreter { context: Primitive::Int(123) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 2.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 2));
 
     let parse_result = ValueParser::new().parse("selectCase($ < 10, $ >= 10 and $ < 100)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(50.0) };
+    let interpreter = Interpreter { context: Primitive::Int(50) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 1.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 1));
 
     let parse_result = ValueParser::new().parse("selectCase($ < 10, $ >= 10 and $ < 100)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(-123.0) };
+    let interpreter = Interpreter { context: Primitive::Int(-123) };
     let result = interpreter.visit(ast).unwrap();
-    assert!(matches!(result, Primitive::Number(num) if num == 0.0));
+    assert!(matches!(result, Primitive::Int(num) if num == 0));
 }
 
 #[test]
 fn interpret_select_all_cases() {
     let parse_result = ValueParser::new().parse("selectAllCases($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(1.0) };
+    let interpreter = Interpreter { context: Primitive::Int(1) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 1);
@@ -59,7 +59,7 @@ fn interpret_select_all_cases() {
 
     let parse_result = ValueParser::new().parse("selectAllCases($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(7.0) };
+    let interpreter = Interpreter { context: Primitive::Int(7) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 2);
@@ -69,7 +69,7 @@ fn interpret_select_all_cases() {
 
     let parse_result = ValueParser::new().parse("selectAllCases($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(12.0) };
+    let interpreter = Interpreter { context: Primitive::Int(12) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 1);
@@ -82,7 +82,7 @@ fn interpret_select_all_cases() {
 fn interpret_examine() {
     let parse_result = ValueParser::new().parse("examine($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(1.0) };
+    let interpreter = Interpreter { context: Primitive::Int(1) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 2);
@@ -92,7 +92,7 @@ fn interpret_examine() {
 
     let parse_result = ValueParser::new().parse("examine($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(7.0) };
+    let interpreter = Interpreter { context: Primitive::Int(7) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 2);
@@ -102,7 +102,7 @@ fn interpret_examine() {
 
     let parse_result = ValueParser::new().parse("examine($ < 10, $ > 5)");
     let ast = parse_result.unwrap();
-    let interpreter = Interpreter { context: Primitive::Number(12.0) };
+    let interpreter = Interpreter { context: Primitive::Int(12) };
     match interpreter.visit(ast).unwrap() {
         Primitive::Array(array) => {
             assert_eq!(array.len(), 2);

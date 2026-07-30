@@ -5,34 +5,34 @@ use yaql::yaql::ValueParser;
 fn parse_numeric() {
     let parse_result = ValueParser::new().parse("1");
     let ast = parse_result.unwrap();
-    assert!(matches!(ast, Value::NumberLiteral(_)));
+    assert!(matches!(ast, Value::IntLiteral(_)));
     match ast {
-        Value::NumberLiteral(num) => assert!(matches!(num, 1.0)),
-        _ => panic!("expected NumberLiteral"),
+        Value::IntLiteral(num) => assert_eq!(num, 1),
+        _ => panic!("expected IntLiteral"),
     }
 
     let parse_result = ValueParser::new().parse("-1");
     let ast = parse_result.unwrap();
-    assert!(matches!(ast, Value::NumberLiteral(_)));
+    assert!(matches!(ast, Value::IntLiteral(_)));
     match ast {
-        Value::NumberLiteral(num) => assert!(matches!(num, -1.0)),
-        _ => panic!("expected NumberLiteral"),
+        Value::IntLiteral(num) => assert_eq!(num, -1),
+        _ => panic!("expected IntLiteral"),
     }
 
     let parse_result = ValueParser::new().parse("1.0");
     let ast = parse_result.unwrap();
-    assert!(matches!(ast, Value::NumberLiteral(_)));
+    assert!(matches!(ast, Value::FloatLiteral(_)));
     match ast {
-        Value::NumberLiteral(num) => assert!(matches!(num, 1.0)),
-        _ => panic!("expected NumberLiteral"),
+        Value::FloatLiteral(num) => assert!(matches!(num, 1.0)),
+        _ => panic!("expected FloatLiteral"),
     }
 
     let parse_result = ValueParser::new().parse("-1.1");
     let ast = parse_result.unwrap();
-    assert!(matches!(ast, Value::NumberLiteral(_)));
+    assert!(matches!(ast, Value::FloatLiteral(_)));
     match ast {
-        Value::NumberLiteral(num) => assert!(matches!(num, -1.1)),
-        _ => panic!("expected NumberLiteral"),
+        Value::FloatLiteral(num) => assert!(matches!(num, -1.1)),
+        _ => panic!("expected FloatLiteral"),
     }
 }
 
@@ -161,8 +161,8 @@ fn parse_binary_operators() {
     match ast {
         Value::BinaryOperator(left, op, right) => {
             match *left {
-                Value::NumberLiteral(num) => {
-                    assert!(matches!(num, 2.0));
+                Value::IntLiteral(num) => {
+                    assert_eq!(num, 2);
                 }
                 _ => panic!("expected Number"),
             }
@@ -170,8 +170,8 @@ fn parse_binary_operators() {
             assert_eq!(op, "+");
 
             match *right {
-                Value::NumberLiteral(num) => {
-                    assert!(matches!(num, 3.0));
+                Value::IntLiteral(num) => {
+                    assert_eq!(num, 3);
                 }
                 _ => panic!("expected Number"),
             }

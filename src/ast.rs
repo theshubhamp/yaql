@@ -1,7 +1,8 @@
 #[derive(Debug)]
 pub enum Value {
     StringLiteral(String),
-    NumberLiteral(f64),
+    IntLiteral(i64),
+    FloatLiteral(f64),
     BooleanLiteral(bool),
     NullLiteral,
     Dollar(String),
@@ -17,7 +18,8 @@ pub trait Expression<T> {
 pub trait Visitor<T> {
     fn visit(&self, value: Value) -> T;
     fn visit_string_literal(&self, string: String) -> T;
-    fn visit_number_literal(&self, num: f64) -> T;
+    fn visit_int_literal(&self, num: i64) -> T;
+    fn visit_float_literal(&self, num: f64) -> T;
     fn visit_boolean_literal(&self, bool: bool) -> T;
     fn visit_null_literal(&self) -> T;
     fn visit_dollar(&self, path: String) -> T;
