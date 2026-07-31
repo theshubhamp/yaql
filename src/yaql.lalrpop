@@ -23,8 +23,14 @@ match {
 }
 
 pub Value: Value = {
-    <l:Atom> "." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), ".".to_string(), Box::new(r)),
-    <l:Atom> "?." <r:ComparisonP1> => Value::BinaryOperator(Box::new(l), "?.".to_string(), Box::new(r)),
+    <l:Atom> "." <r:ComparisonP1> => match r {
+        Value::FunctionCall(name, args, kwargs) => Value::MethodCall(Box::new(l), false, name, args, kwargs),
+        other => Value::BinaryOperator(Box::new(l), ".".to_string(), Box::new(other)),
+    },
+    <l:Atom> "?." <r:ComparisonP1> => match r {
+        Value::FunctionCall(name, args, kwargs) => Value::MethodCall(Box::new(l), true, name, args, kwargs),
+        other => Value::BinaryOperator(Box::new(l), "?.".to_string(), Box::new(other)),
+    },
     ComparisonP1,
 }
 

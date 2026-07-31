@@ -9,6 +9,7 @@ pub enum Value {
     FunctionCall(String, Vec<Value>, Vec<(Value, Value)>),
     BinaryOperator(Box<Value>, String, Box<Value>),
     UnaryOperator(String, Box<Value>),
+    MethodCall(Box<Value>, bool, String, Vec<Value>, Vec<(Value, Value)>),
 }
 
 pub trait Expression<T> {
@@ -26,4 +27,5 @@ pub trait Visitor<T> {
     fn visit_function_call(&self, identifier: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> T;
     fn visit_binary_operator(&self, left: Value, op: String, right: Value) -> T;
     fn visit_unary_operator(&self, op: String, operand: Value) -> T;
+    fn visit_method_call(&self, receiver: Value, optional: bool, method: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> T;
 }

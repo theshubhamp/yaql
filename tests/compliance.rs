@@ -302,7 +302,32 @@ compliance_cases! {
     case_str_eq: "a = a", Value::Null;
     case_str_neq: "a != b", Value::Null;
     case_str_min: "min(a, z)", Value::Null;
+    case_str_len: "len(abc)", Value::Null;
+    case_str_to_upper: "qq.toUpper()", Value::Null;
+    case_str_to_lower: "QQ.toLower()", Value::Null;
+    case_str_is_string: "isString(abc)", Value::Null;
+    case_str_is_string_null: "isString(null)", Value::Null;
+    case_str_is_string_num: "isString(123)", Value::Null;
+    case_str_concat: "a + b + c", Value::Null;
+    case_str_concat_func: "concat(a, b, c)", Value::Null;
+    case_str_in: "B in ABC", Value::Null;
+    case_str_in_false: "D in ABC", Value::Null;
+    case_str_mul: "x * 3", Value::Null;
+    case_str_mul_rev: "3 * x", Value::Null;
+    case_str_str_null: "str(null)", Value::Null;
+    case_str_str_true: "str(true)", Value::Null;
+    case_str_str_false: "str(false)", Value::Null;
+    case_str_hex: "hex(255)", Value::Null;
+    case_str_hex_neg: "hex(-42)", Value::Null;
+    case_str_starts_with: "ABC.startsWith(A)", Value::Null;
+    case_str_ends_with: "ABC.endsWith(C)", Value::Null;
+    case_str_max: "max(a, z)", Value::Null;
+    case_str_to_char_array: "abc.toCharArray()", Value::Null;
+    case_str_is_empty: "isEmpty('')", Value::Null;
+    case_str_is_empty_null: "isEmpty(null)", Value::Null;
+    case_q_len: "len($)", json!([1, 2, 3]);
 }
+
 
 
 ignored_compliance_cases! {
@@ -334,29 +359,6 @@ ignored_compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
-    case_str_len: "len(abc)", Value::Null;
-    case_str_to_upper: "qq.toUpper()", Value::Null;
-    case_str_to_lower: "QQ.toLower()", Value::Null;
-    case_str_is_string: "isString(abc)", Value::Null;
-    case_str_is_string_null: "isString(null)", Value::Null;
-    case_str_is_string_num: "isString(123)", Value::Null;
-    case_str_concat: "a + b + c", Value::Null;
-    case_str_concat_func: "concat(a, b, c)", Value::Null;
-    case_str_in: "B in ABC", Value::Null;
-    case_str_in_false: "D in ABC", Value::Null;
-    case_str_mul: "x * 3", Value::Null;
-    case_str_mul_rev: "3 * x", Value::Null;
-    case_str_str_null: "str(null)", Value::Null;
-    case_str_str_true: "str(true)", Value::Null;
-    case_str_str_false: "str(false)", Value::Null;
-    case_str_hex: "hex(255)", Value::Null;
-    case_str_hex_neg: "hex(-42)", Value::Null;
-    case_str_starts_with: "ABC.startsWith(A)", Value::Null;
-    case_str_ends_with: "ABC.endsWith(C)", Value::Null;
-    case_str_max: "max(a, z)", Value::Null;
-    case_str_to_char_array: "abc.toCharArray()", Value::Null;
-    case_str_is_empty: "isEmpty('')", Value::Null;
-    case_str_is_empty_null: "isEmpty(null)", Value::Null;
     // --- upstream test_collections.py ---
     case_coll_list_empty: "list()", Value::Null;
     case_coll_list: "list(1, 2, 3)", Value::Null;
@@ -393,7 +395,6 @@ ignored_compliance_cases! {
     case_q_last: "list(2, 3).last()", Value::Null;
     case_q_range: "range(2)", Value::Null;
     case_q_range_2: "range(1, 4)", Value::Null;
-    case_q_len: "len($)", json!([1, 2, 3]);
     case_q_count: "$.count()", json!([1, 2, 3]);
     case_q_sum: "$.sum()", json!([0, 1, 2, 3]);
     case_q_sum_init: "$.sum(100)", json!([0, 1, 2, 3]);

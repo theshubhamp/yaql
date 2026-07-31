@@ -43,7 +43,10 @@ fn arith(left: &Primitive, right: &Primitive, f: fn(f64, f64) -> f64, i: fn(i64,
 }
 
 pub fn add(left: Primitive, right: Primitive) -> Primitive {
-    arith(&left, &right, |a, b| a + b, |a, b| a + b)
+    match (&left, &right) {
+        (Primitive::String(l), Primitive::String(r)) => Primitive::String(format!("{}{}", l, r)),
+        _ => arith(&left, &right, |a, b| a + b, |a, b| a + b),
+    }
 }
 
 pub fn sub(left: Primitive, right: Primitive) -> Primitive {
@@ -51,7 +54,11 @@ pub fn sub(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn mul(left: Primitive, right: Primitive) -> Primitive {
-    arith(&left, &right, |a, b| a * b, |a, b| a * b)
+    match (&left, &right) {
+        (Primitive::String(s), Primitive::Int(n)) => Primitive::String(s.repeat(*n as usize)),
+        (Primitive::Int(n), Primitive::String(s)) => Primitive::String(s.repeat(*n as usize)),
+        _ => arith(&left, &right, |a, b| a * b, |a, b| a * b),
+    }
 }
 
 pub fn div(left: Primitive, right: Primitive) -> Primitive {
@@ -156,6 +163,15 @@ pub fn gteq(left: Primitive, right: Primitive) -> Primitive {
     Primitive::Boolean(gt || eq)
 }
 
+pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
+    let result = match (&left, &right) {
+        (Primitive::String(needle), Primitive::String(haystack)) => haystack.contains(needle.as_str()),
+        (Primitive::Array(arr, ..), _) => arr.iter().any(|e| matches!(eq(e.clone(), left.clone()), Primitive::Boolean(true))),
+        _ => false,
+    };
+    Primitive::Boolean(result)
+}
+
 pub struct BinaryOperators;
 
 impl BinaryOperators {
@@ -174,6 +190,7 @@ impl BinaryOperators {
             "<=" => lteq,
             ">" => gt,
             ">=" => gteq,
+            "in" => in_op,
             _ => todo!()
         }
     }
@@ -236,6 +253,19 @@ pub fn examine(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Pri
     return Primitive::Array(cases);
 }
 
+fn compare(a: &Primitive, b: &Primitive) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (a, b) {
+        (Primitive::Int(l), Primitive::Int(r)) => l.cmp(r),
+        (Primitive::Float(l), Primitive::Float(r)) => l.partial_cmp(r).unwrap_or(Ordering::Equal),
+        (Primitive::Int(l), Primitive::Float(r)) => (*l as f64).partial_cmp(r).unwrap_or(Ordering::Equal),
+        (Primitive::Float(l), Primitive::Int(r)) => l.partial_cmp(&(*r as f64)).unwrap_or(Ordering::Equal),
+        (Primitive::String(l), Primitive::String(r)) => l.cmp(r),
+        (Primitive::Boolean(l), Primitive::Boolean(r)) => l.cmp(r),
+        _ => Ordering::Equal,
+    }
+}
+
 pub fn max(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     assert_eq!(kwargs.len(), 0);
     let mut result: Option<Primitive> = None;
@@ -243,7 +273,7 @@ pub fn max(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primiti
         result = Some(match (result, arg) {
             (None, a) | (Some(Primitive::Null), a) => a,
             (r, Primitive::Null) => r.unwrap(),
-            (Some(r), a) => if as_f64(&r) >= as_f64(&a) { r } else { a },
+            (Some(r), a) => if compare(&r, &a) >= std::cmp::Ordering::Equal { r } else { a },
         });
     }
     result.unwrap_or(Primitive::Null)
@@ -257,7 +287,7 @@ pub fn min(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primiti
             (None, a) => a,
             (Some(Primitive::Null), _) => Primitive::Null,
             (r, Primitive::Null) => r.unwrap(),
-            (Some(r), a) => if as_f64(&r) <= as_f64(&a) { r } else { a },
+            (Some(r), a) => if compare(&r, &a) <= std::cmp::Ordering::Equal { r } else { a },
         });
     }
     result.unwrap_or(Primitive::Null)
@@ -279,6 +309,116 @@ pub fn coalesce(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Pr
     Primitive::Null
 }
 
+pub fn len(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::String(s) => Primitive::Int(s.chars().count() as i64),
+        Primitive::Array(a) => Primitive::Int(a.len() as i64),
+        Primitive::Map(m) => Primitive::Int(m.len() as i64),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn concat(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    let mut result = String::new();
+    for arg in &args {
+        if let Primitive::String(s) = arg {
+            result.push_str(s);
+        }
+    }
+    Primitive::String(result)
+}
+
+pub fn to_str(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::String(s) => Primitive::String(s.clone()),
+        Primitive::Int(n) => Primitive::String(n.to_string()),
+        Primitive::Float(n) => Primitive::String(n.to_string()),
+        Primitive::Boolean(b) => Primitive::String(b.to_string()),
+        Primitive::Null => Primitive::String("null".to_string()),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn hex(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Int(n) if *n >= 0 => Primitive::String(format!("0x{:x}", n)),
+        Primitive::Int(n) => Primitive::String(format!("-0x{:x}", n.abs())),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn to_upper(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::String(s) => Primitive::String(s.to_uppercase()),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn to_lower(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::String(s) => Primitive::String(s.to_lowercase()),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn starts_with(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match (&args.get(0), &args.get(1)) {
+        (Some(Primitive::String(s)), Some(Primitive::String(prefix))) => {
+            Primitive::Boolean(s.starts_with(prefix.as_str()))
+        }
+        _ => Primitive::Boolean(false),
+    }
+}
+
+pub fn ends_with(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match (&args.get(0), &args.get(1)) {
+        (Some(Primitive::String(s)), Some(Primitive::String(suffix))) => {
+            Primitive::Boolean(s.ends_with(suffix.as_str()))
+        }
+        _ => Primitive::Boolean(false),
+    }
+}
+
+pub fn is_empty(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    Primitive::Boolean(match &args[0] {
+        Primitive::String(s) => s.is_empty() || s.trim().is_empty(),
+        Primitive::Null => true,
+        Primitive::Array(a) => a.is_empty(),
+        Primitive::Map(m) => m.is_empty(),
+        _ => false,
+    })
+}
+
+pub fn is_string(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    Primitive::Boolean(matches!(args[0], Primitive::String(_)))
+}
+
+pub fn to_char_array(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::String(s) => Primitive::Array(s.chars().map(|c| Primitive::String(c.to_string())).collect()),
+        _ => Primitive::Null,
+    }
+}
+
 pub struct Functions;
 
 impl Functions {
@@ -292,6 +432,17 @@ impl Functions {
             "coalesce" => coalesce,
             "max" => max,
             "min" => min,
+            "len" => len,
+            "concat" => concat,
+            "str" => to_str,
+            "hex" => hex,
+            "isEmpty" => is_empty,
+            "isString" => is_string,
+            "toCharArray" => to_char_array,
+            "toUpper" => to_upper,
+            "toLower" => to_lower,
+            "startsWith" => starts_with,
+            "endsWith" => ends_with,
             _ => todo!()
         }
     }

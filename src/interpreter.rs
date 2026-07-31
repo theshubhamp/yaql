@@ -18,6 +18,7 @@ impl Visitor<Option<Primitive>> for Interpreter {
             Value::FunctionCall(identifier, args, kwargs) => self.visit_function_call(identifier, args, kwargs),
             Value::BinaryOperator(left, op, right) => self.visit_binary_operator(*left, op, *right),
             Value::UnaryOperator(op, operand) => self.visit_unary_operator(op, *operand),
+            Value::MethodCall(receiver, optional, method, args, kwargs) => self.visit_method_call(*receiver, optional, method, args, kwargs),
         }
     }
 
@@ -75,6 +76,27 @@ impl Visitor<Option<Primitive>> for Interpreter {
         let right_value = right_value.unwrap();
 
         return Some(BINARY_OPERATORS.lookup(op)(left_value, right_value));
+    }
+
+    fn visit_method_call(&self, receiver: Value, optional: bool, method: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> Option<Primitive> {
+        let receiver_value = self.visit(receiver)?;
+
+        // ?. returns null if receiver is null, . raises an error
+        if optional && matches!(receiver_value, Primitive::Null) {
+            return Some(Primitive::Null);
+        }
+
+        let mut arg_values = vec![receiver_value];
+        for arg in args {
+            arg_values.push(self.visit(arg)?);
+        }
+
+        let mut kwarg_values = Vec::new();
+        for (k, v) in kwargs {
+            kwarg_values.push((self.visit(k)?, self.visit(v)?));
+        }
+
+        return Some(FUNCTIONS.lookup(method)(arg_values, kwarg_values));
     }
 
     fn visit_unary_operator(&self, op: String, operand: Value) -> Option<Primitive> {
