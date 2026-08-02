@@ -509,6 +509,153 @@ pub fn set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Prim
     Primitive::Array(seen)
 }
 
+// --- Math functions ---
+
+pub fn abs(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Int(n) => Primitive::Int(n.abs()),
+        Primitive::Float(n) => Primitive::Float(n.abs()),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn sign(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Int(n) => Primitive::Int(n.signum()),
+        Primitive::Float(n) => Primitive::Int(if *n > 0.0 { 1 } else if *n < 0.0 { -1 } else { 0 }),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn pow_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(b), Primitive::Int(e)) => Primitive::Int(b.pow(*e as u32)),
+        _ => match (as_f64(&args[0]), as_f64(&args[1])) {
+            (Some(b), Some(e)) => Primitive::Float(b.powf(e)),
+            _ => Primitive::Null,
+        },
+    }
+}
+
+pub fn round(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match as_f64(&args[0]) {
+        Some(n) => Primitive::Float(bankers_round(n)),
+        None => Primitive::Null,
+    }
+}
+
+/// Round half to even (banker's rounding), matching Python's round().
+fn bankers_round(n: f64) -> f64 {
+    let i = n as i64;
+    let diff = n - i as f64;
+    if diff > 0.5 || diff < -0.5 {
+        n.round()
+    } else if diff == 0.5 || diff == -0.5 {
+        // Round to even
+        if i % 2 == 0 { i as f64 } else { (i + 1) as f64 }
+    } else {
+        i as f64
+    }
+}
+
+pub fn int_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Int(n) => Primitive::Int(*n),
+        Primitive::Float(n) => Primitive::Int(*n as i64),
+        Primitive::String(s) => match s.trim().parse::<i64>() {
+            Ok(n) => Primitive::Int(n),
+            Err(_) => match s.trim().parse::<f64>() {
+                Ok(f) => Primitive::Int(f as i64),
+                Err(_) => Primitive::Null,
+            },
+        },
+        Primitive::Null => Primitive::Int(0),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn float_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Int(n) => Primitive::Float(*n as f64),
+        Primitive::Float(n) => Primitive::Float(*n),
+        Primitive::String(s) => match s.trim().parse::<f64>() {
+            Ok(f) => Primitive::Float(f),
+            Err(_) => Primitive::Null,
+        },
+        Primitive::Null => Primitive::Float(0.0),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn is_integer(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    Primitive::Boolean(matches!(args[0], Primitive::Int(_)))
+}
+
+pub fn is_number(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    Primitive::Boolean(matches!(args[0], Primitive::Int(_) | Primitive::Float(_)))
+}
+
+pub fn bitwise_or(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(a), Primitive::Int(b)) => Primitive::Int(a | b),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn bitwise_and(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(a), Primitive::Int(b)) => Primitive::Int(a & b),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn bitwise_xor(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(a), Primitive::Int(b)) => Primitive::Int(a ^ b),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn shift_bits_left(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(a), Primitive::Int(b)) => Primitive::Int(a << b),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn shift_bits_right(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Int(a), Primitive::Int(b)) => Primitive::Int(a >> b),
+        _ => Primitive::Null,
+    }
+}
+
 pub struct Functions;
 
 impl Functions {
@@ -540,6 +687,19 @@ impl Functions {
             "values" => values_fn,
             "contains" => contains_fn,
             "set" => set_fn,
+            "abs" => abs,
+            "sign" => sign,
+            "pow" => pow_fn,
+            "round" => round,
+            "int" => int_fn,
+            "float" => float_fn,
+            "isInteger" => is_integer,
+            "isNumber" => is_number,
+            "bitwiseOr" => bitwise_or,
+            "bitwiseAnd" => bitwise_and,
+            "bitwiseXor" => bitwise_xor,
+            "shiftBitsLeft" => shift_bits_left,
+            "shiftBitsRight" => shift_bits_right,
             _ => todo!()
         }
     }

@@ -225,7 +225,16 @@ impl<'input> Iterator for Lexer<'input> {
                 '}' => Tok::RBrace,
                 ',' => Tok::Comma,
                 '.' => Tok::Dot,
-                '+' => Tok::Plus,
+                '+' => {
+                    if is_expr_start(&self.prev_tok) {
+                        if let Some(c) = self.peek_byte_after(0) {
+                            if c.is_ascii_digit() {
+                                return Some(self.lex_number(start));
+                            }
+                        }
+                    }
+                    Tok::Plus
+                }
                 '-' => {
                     if is_expr_start(&self.prev_tok) {
                         if let Some(c) = self.peek_byte_after(0) {

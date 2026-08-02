@@ -350,18 +350,6 @@ compliance_cases! {
     case_coll_dict_eq: "{a => [c, 55]} = {a => [c, 55]}", Value::Null;
     case_coll_in_list: "5 in [1, 2, 5]", Value::Null;
     case_coll_contains: "[1, 2, 5].contains(5)", Value::Null;
-}
-
-
-
-
-
-ignored_compliance_cases! {
-    // --- reference CLI rejects leading-dash positional args ---
-    case_math_mul_neg_neg: "-3 * -2", Value::Null;
-    case_math_unary_minus: "-4", Value::Null;
-    case_math_unary_minus_float: "-12.0", Value::Null;
-    case_math_unary_plus: "+4", Value::Null;
     case_math_abs_neg: "abs(-4)", Value::Null;
     case_math_abs_pos: "abs(4)", Value::Null;
     case_math_abs_float: "abs(-4.4)", Value::Null;
@@ -385,6 +373,18 @@ ignored_compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
+}
+
+
+
+
+
+ignored_compliance_cases! {
+    // --- reference CLI rejects leading-dash positional args ---
+    case_math_mul_neg_neg: "-3 * -2", Value::Null;
+    case_math_unary_minus: "-4", Value::Null;
+    case_math_unary_minus_float: "-12.0", Value::Null;
+    case_math_unary_plus: "+4", Value::Null;
     case_coll_set_eq: "set(1, 2, 3) = set(3, 2, 1)", Value::Null;
     // --- upstream test_queries.py ---
     case_q_where: "$.where($ > 3)", json!([1, 2, 3, 4, 5, 6]);
