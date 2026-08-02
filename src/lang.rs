@@ -278,8 +278,11 @@ fn compare(a: &Primitive, b: &Primitive) -> std::cmp::Ordering {
 
 pub fn max(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     assert_eq!(kwargs.len(), 0);
+    let iter: Vec<Primitive> = if args.len() == 1 {
+        match &args[0] { Primitive::Array(a) => a.clone(), other => vec![other.clone()] }
+    } else { args };
     let mut result: Option<Primitive> = None;
-    for arg in args {
+    for arg in iter {
         result = Some(match (result, arg) {
             (None, a) | (Some(Primitive::Null), a) => a,
             (r, Primitive::Null) => r.unwrap(),
@@ -291,8 +294,11 @@ pub fn max(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primiti
 
 pub fn min(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     assert_eq!(kwargs.len(), 0);
+    let iter: Vec<Primitive> = if args.len() == 1 {
+        match &args[0] { Primitive::Array(a) => a.clone(), other => vec![other.clone()] }
+    } else { args };
     let mut result: Option<Primitive> = None;
-    for arg in args {
+    for arg in iter {
         result = Some(match (result, arg) {
             (None, a) => a,
             (Some(Primitive::Null), _) => Primitive::Null,
@@ -509,6 +515,138 @@ pub fn set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Prim
     Primitive::Array(seen)
 }
 
+// --- Query functions (non-lambda) ---
+
+pub fn skip(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Array(arr), Primitive::Int(n)) => {
+            let n = (*n as usize).min(arr.len());
+            Primitive::Array(arr[n..].to_vec())
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn take(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 2);
+    match (&args[0], &args[1]) {
+        (Primitive::Array(arr), Primitive::Int(n)) => {
+            let n = (*n as usize).min(arr.len());
+            Primitive::Array(arr[..n].to_vec())
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn count(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Array(arr) => Primitive::Int(arr.len() as i64),
+        Primitive::Map(m) => Primitive::Int(m.len() as i64),
+        Primitive::String(s) => Primitive::Int(s.chars().count() as i64),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn sum(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match args.first() {
+        Some(Primitive::Array(arr)) => {
+            let init = if args.len() > 1 { args[1].clone() } else { Primitive::Int(0) };
+            arr.iter().fold(init, |acc, e| add(acc, e.clone()))
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn first(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Array(arr) => arr.first().cloned().unwrap_or(Primitive::Null),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn last(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Array(arr) => arr.last().cloned().unwrap_or(Primitive::Null),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn range(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match args.len() {
+        1 => match &args[0] {
+            Primitive::Int(n) => Primitive::Array((0..*n).map(Primitive::Int).collect()),
+            _ => Primitive::Null,
+        },
+        2 => match (&args[0], &args[1]) {
+            (Primitive::Int(start), Primitive::Int(end)) => {
+                Primitive::Array((*start..*end).map(Primitive::Int).collect())
+            }
+            _ => Primitive::Null,
+        },
+        _ => Primitive::Null,
+    }
+}
+
+pub fn append(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match args.first() {
+        Some(Primitive::Array(arr)) => {
+            let mut result = arr.clone();
+            result.extend(args[1..].iter().cloned());
+            Primitive::Array(result)
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn reverse(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Array(arr) => {
+            let mut r = arr.clone();
+            r.reverse();
+            Primitive::Array(r)
+        }
+        Primitive::String(s) => Primitive::String(s.chars().rev().collect()),
+        _ => Primitive::Null,
+    }
+}
+
+pub fn is_iterable(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    Primitive::Boolean(matches!(args[0], Primitive::Array(_) | Primitive::Map(_) | Primitive::String(_)))
+}
+
+pub fn distinct(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Array(arr) => {
+            let mut seen = Vec::new();
+            for e in arr {
+                if !seen.iter().any(|s: &Primitive| matches!(eq(s.clone(), e.clone()), Primitive::Boolean(true))) {
+                    seen.push(e.clone());
+                }
+            }
+            Primitive::Array(seen)
+        }
+        _ => Primitive::Null,
+    }
+}
+
 // --- Math functions ---
 
 pub fn abs(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
@@ -687,6 +825,18 @@ impl Functions {
             "values" => values_fn,
             "contains" => contains_fn,
             "set" => set_fn,
+            "skip" => skip,
+            "take" => take,
+            "limit" => take,
+            "count" => count,
+            "sum" => sum,
+            "first" => first,
+            "last" => last,
+            "range" => range,
+            "append" => append,
+            "reverse" => reverse,
+            "isIterable" => is_iterable,
+            "distinct" => distinct,
             "abs" => abs,
             "sign" => sign,
             "pow" => pow_fn,

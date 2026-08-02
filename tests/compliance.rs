@@ -373,6 +373,22 @@ compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
+    case_q_skip: "$.skip(1)", json!([1, 2, 3, 4]);
+    case_q_take: "$.take(2)", json!([1, 2, 3, 4]);
+    case_q_limit: "$.limit(2)", json!([1, 2, 3, 4]);
+    case_q_distinct: "$.distinct()", json!([1, 2, 3, 2, 4, 8]);
+    case_q_first: "list(2, 3).first()", Value::Null;
+    case_q_last: "list(2, 3).last()", Value::Null;
+    case_q_range: "range(2)", Value::Null;
+    case_q_range_2: "range(1, 4)", Value::Null;
+    case_q_count: "$.count()", json!([1, 2, 3]);
+    case_q_sum: "$.sum()", json!([0, 1, 2, 3]);
+    case_q_sum_init: "$.sum(100)", json!([0, 1, 2, 3]);
+    case_q_max_list: "[44, 234, 23].max()", Value::Null;
+    case_q_min_list: "[44, 234, 23].min()", Value::Null;
+    case_q_append: "$.append(3, 4)", json!([1, 2]);
+    case_q_is_iterable_list: "isIterable([])", Value::Null;
+    case_q_is_iterable_num: "isIterable(1)", Value::Null;
 }
 
 
@@ -389,27 +405,11 @@ ignored_compliance_cases! {
     // --- upstream test_queries.py ---
     case_q_where: "$.where($ > 3)", json!([1, 2, 3, 4, 5, 6]);
     case_q_select: "$.select($ * $)", json!([1, 2, 3]);
-    case_q_skip: "$.skip(1)", json!([1, 2, 3, 4]);
-    case_q_take: "$.take(2)", json!([1, 2, 3, 4]);
-    case_q_limit: "$.limit(2)", json!([1, 2, 3, 4]);
-    case_q_distinct: "$.distinct()", json!([1, 2, 3, 2, 4, 8]);
-    case_q_first: "list(2, 3).first()", Value::Null;
-    case_q_last: "list(2, 3).last()", Value::Null;
-    case_q_range: "range(2)", Value::Null;
-    case_q_range_2: "range(1, 4)", Value::Null;
-    case_q_count: "$.count()", json!([1, 2, 3]);
-    case_q_sum: "$.sum()", json!([0, 1, 2, 3]);
-    case_q_sum_init: "$.sum(100)", json!([0, 1, 2, 3]);
-    case_q_max_list: "[44, 234, 23].max()", Value::Null;
-    case_q_min_list: "[44, 234, 23].min()", Value::Null;
     case_q_reverse: "range(1, 4).select($*$).reverse()", Value::Null;
     case_q_order_by: "$.orderBy($)", json!([4, 2, 1, 3]);
     case_q_order_by_desc: "$.orderByDescending($)", json!([4, 2, 1, 3]);
-    case_q_append: "$.append(3, 4)", json!([1, 2]);
     case_q_any_empty: "$.any()", json!([]);
     case_q_any_nonempty: "$.any()", json!([0]);
     case_q_all_empty: "$.all()", json!([]);
     case_q_all_nonempty: "$.all()", json!([1, 2]);
-    case_q_is_iterable_list: "isIterable([])", Value::Null;
-    case_q_is_iterable_num: "isIterable(1)", Value::Null;
 }
