@@ -1,11 +1,11 @@
 use yaql::ast::Visitor;
 use yaql::interpreter::Interpreter;
 use yaql::lang::Primitive;
-use yaql::yaql::ValueParser;
+use yaql::parser::Parser;
 
 #[test]
 fn interpret_string() {
-    let parse_result = ValueParser::new().parse("'string'");
+    let parse_result = Parser::parse("'string'");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
@@ -21,7 +21,7 @@ fn interpret_string() {
 
 #[test]
 fn interpret_number() {
-    let parse_result = ValueParser::new().parse("4.2");
+    let parse_result = Parser::parse("4.2");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
@@ -37,7 +37,7 @@ fn interpret_number() {
 
 #[test]
 fn interpret_boolean() {
-    let parse_result = ValueParser::new().parse("false");
+    let parse_result = Parser::parse("false");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
@@ -48,7 +48,7 @@ fn interpret_boolean() {
         _ => panic!("expected Boolean"),
     }
 
-    let parse_result = ValueParser::new().parse("true");
+    let parse_result = Parser::parse("true");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
@@ -64,7 +64,7 @@ fn interpret_boolean() {
 
 #[test]
 fn interpret_null() {
-    let parse_result = ValueParser::new().parse("null");
+    let parse_result = Parser::parse("null");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
@@ -78,7 +78,7 @@ fn interpret_null() {
 
 #[test]
 fn interpret_dollar() {
-    let parse_result = ValueParser::new().parse("$");
+    let parse_result = Parser::parse("$");
     let ast = parse_result.unwrap();
 
     let result = Interpreter{ context: Primitive::Int(12) }.visit(ast).unwrap();

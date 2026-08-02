@@ -19,6 +19,9 @@ impl Visitor<Option<Primitive>> for Interpreter {
             Value::BinaryOperator(left, op, right) => self.visit_binary_operator(*left, op, *right),
             Value::UnaryOperator(op, operand) => self.visit_unary_operator(op, *operand),
             Value::MethodCall(receiver, optional, method, args, kwargs) => self.visit_method_call(*receiver, optional, method, args, kwargs),
+            Value::List(elements) => self.visit_list(elements),
+            Value::Dict(entries) => self.visit_dict(entries),
+            Value::Index(collection, indices) => self.visit_index(*collection, indices),
         }
     }
 
@@ -109,6 +112,43 @@ impl Visitor<Option<Primitive>> for Interpreter {
                 _ => None,
             },
             "+" => Some(val),
+            _ => None,
+        }
+    }
+
+    fn visit_list(&self, elements: Vec<Value>) -> Option<Primitive> {
+        let mut items = Vec::new();
+        for e in elements {
+            items.push(self.visit(e)?);
+        }
+        Some(Primitive::Array(items))
+    }
+
+    fn visit_dict(&self, entries: Vec<(Value, Value)>) -> Option<Primitive> {
+        let mut map = std::collections::HashMap::new();
+        for (k, v) in entries {
+            let key = match self.visit(k)? {
+                Primitive::String(s) => s,
+                Primitive::Int(n) => n.to_string(),
+                Primitive::Boolean(b) => b.to_string(),
+                Primitive::Null => "null".to_string(),
+                _ => continue,
+            };
+            map.insert(key, self.visit(v)?);
+        }
+        Some(Primitive::Map(map))
+    }
+
+    fn visit_index(&self, collection: Value, indices: Vec<Value>) -> Option<Primitive> {
+        let coll = self.visit(collection)?;
+        let idx = self.visit(indices.into_iter().next()?)?;
+        match (&coll, &idx) {
+            (Primitive::Array(arr), Primitive::Int(i)) => {
+                let len = arr.len() as i64;
+                let pos = if *i < 0 { *i + len } else { *i };
+                arr.get(pos as usize).cloned()
+            }
+            (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned(),
             _ => None,
         }
     }

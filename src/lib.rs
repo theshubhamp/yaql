@@ -2,11 +2,8 @@ pub mod ast;
 pub mod interpreter;
 pub mod json;
 pub mod lang;
-
-#[macro_use]
-extern crate lalrpop_util;
-
-lalrpop_mod!(pub yaql); // synthesized by LALRPOP
+pub mod lexer;
+pub mod parser;
 
 use ast::Visitor;
 use interpreter::Interpreter;
@@ -20,8 +17,7 @@ pub enum EvalResult {
 
 pub fn evaluate(expr: &str, context: serde_json::Value) -> EvalResult {
     let context = json::json_to_primitive(&context);
-    let parser = yaql::ValueParser::new();
-    let ast = match parser.parse(expr) {
+    let ast = match parser::Parser::parse(expr) {
         Ok(ast) => ast,
         Err(e) => return EvalResult::ParseError(format!("{}", e)),
     };

@@ -45,6 +45,18 @@ fn arith(left: &Primitive, right: &Primitive, f: fn(f64, f64) -> f64, i: fn(i64,
 pub fn add(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::String(l), Primitive::String(r)) => Primitive::String(format!("{}{}", l, r)),
+        (Primitive::Array(l), Primitive::Array(r)) => {
+            let mut combined = l.clone();
+            combined.extend(r.iter().cloned());
+            Primitive::Array(combined)
+        }
+        (Primitive::Map(l), Primitive::Map(r)) => {
+            let mut combined = l.clone();
+            for (k, v) in r {
+                combined.insert(k.clone(), v.clone());
+            }
+            Primitive::Map(combined)
+        }
         _ => arith(&left, &right, |a, b| a + b, |a, b| a + b),
     }
 }
@@ -85,15 +97,21 @@ pub fn or(left: Primitive, right: Primitive) -> Primitive {
     return right
 }
 
+fn primitive_eq(a: &Primitive, b: &Primitive) -> bool {
+    matches!(eq(a.clone(), b.clone()), Primitive::Boolean(true))
+}
+
 pub fn eq(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (left, right) {
+    let result = match (&left, &right) {
         (Primitive::String(l), Primitive::String(r)) => l == r,
         (Primitive::Int(l), Primitive::Int(r)) => l == r,
         (Primitive::Float(l), Primitive::Float(r)) => l == r,
-        (Primitive::Int(l), Primitive::Float(r)) => l as f64 == r,
-        (Primitive::Float(l), Primitive::Int(r)) => l == r as f64,
+        (Primitive::Int(l), Primitive::Float(r)) => *l as f64 == *r,
+        (Primitive::Float(l), Primitive::Int(r)) => *l == *r as f64,
         (Primitive::Boolean(l), Primitive::Boolean(r)) => l == r,
         (Primitive::Null, Primitive::Null) => true,
+        (Primitive::Array(l), Primitive::Array(r)) => l.len() == r.len() && l.iter().zip(r).all(|(a, b)| primitive_eq(a, b)),
+        (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| primitive_eq(v, rv))),
         _ => false
     };
 
@@ -101,18 +119,10 @@ pub fn eq(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn neq(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (left, right) {
-        (Primitive::String(l), Primitive::String(r)) => l != r,
-        (Primitive::Int(l), Primitive::Int(r)) => l != r,
-        (Primitive::Float(l), Primitive::Float(r)) => l != r,
-        (Primitive::Int(l), Primitive::Float(r)) => l as f64 != r,
-        (Primitive::Float(l), Primitive::Int(r)) => l != r as f64,
-        (Primitive::Boolean(l), Primitive::Boolean(r)) => l != r,
-        (Primitive::Null, Primitive::Null) => false,
-        _ => true
+    let Primitive::Boolean(is_eq) = eq(left, right) else {
+        return Primitive::Boolean(true);
     };
-
-    return Primitive::Boolean(result);
+    Primitive::Boolean(!is_eq)
 }
 
 pub fn lt(left: Primitive, right: Primitive) -> Primitive {
@@ -166,7 +176,7 @@ pub fn gteq(left: Primitive, right: Primitive) -> Primitive {
 pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
     let result = match (&left, &right) {
         (Primitive::String(needle), Primitive::String(haystack)) => haystack.contains(needle.as_str()),
-        (Primitive::Array(arr, ..), _) => arr.iter().any(|e| matches!(eq(e.clone(), left.clone()), Primitive::Boolean(true))),
+        (_, Primitive::Array(arr, ..)) => arr.iter().any(|e| matches!(eq(e.clone(), left.clone()), Primitive::Boolean(true))),
         _ => false,
     };
     Primitive::Boolean(result)
@@ -419,6 +429,86 @@ pub fn to_char_array(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) 
     }
 }
 
+pub fn list_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    Primitive::Array(args)
+}
+
+pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let mut map = std::collections::HashMap::new();
+    for (k, v) in kwargs {
+        let key = match k {
+            Primitive::String(s) => s,
+            Primitive::Int(n) => n.to_string(),
+            Primitive::Boolean(b) => b.to_string(),
+            Primitive::Null => "null".to_string(),
+            _ => continue,
+        };
+        map.insert(key, v);
+    }
+    Primitive::Map(map)
+}
+
+pub fn get_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match (&args.get(0), &args.get(1)) {
+        (Some(Primitive::Map(m)), Some(Primitive::String(key))) => {
+            m.get(key).cloned().unwrap_or(Primitive::Null)
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn keys_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Map(m) => {
+            let mut keys: Vec<String> = m.keys().cloned().collect();
+            keys.sort();
+            Primitive::Array(keys.into_iter().map(Primitive::String).collect())
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn values_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    assert_eq!(args.len(), 1);
+    match &args[0] {
+        Primitive::Map(m) => {
+            let mut keys: Vec<String> = m.keys().cloned().collect();
+            keys.sort();
+            Primitive::Array(keys.into_iter().filter_map(|k| m.get(&k).cloned()).collect())
+        }
+        _ => Primitive::Null,
+    }
+}
+
+pub fn contains_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    match (&args.get(0), &args.get(1)) {
+        (Some(Primitive::Array(arr)), Some(item)) => {
+            Primitive::Boolean(arr.iter().any(|e| primitive_eq(e, item)))
+        }
+        (Some(Primitive::String(s)), Some(Primitive::String(sub))) => {
+            Primitive::Boolean(s.contains(sub.as_str()))
+        }
+        _ => Primitive::Boolean(false),
+    }
+}
+
+pub fn set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    assert_eq!(kwargs.len(), 0);
+    let mut seen = Vec::new();
+    for arg in args {
+        if !seen.iter().any(|e: &Primitive| matches!(eq(e.clone(), arg.clone()), Primitive::Boolean(true))) {
+            seen.push(arg);
+        }
+    }
+    Primitive::Array(seen)
+}
+
 pub struct Functions;
 
 impl Functions {
@@ -443,6 +533,13 @@ impl Functions {
             "toLower" => to_lower,
             "startsWith" => starts_with,
             "endsWith" => ends_with,
+            "list" => list_fn,
+            "dict" => dict_fn,
+            "get" => get_fn,
+            "keys" => keys_fn,
+            "values" => values_fn,
+            "contains" => contains_fn,
+            "set" => set_fn,
             _ => todo!()
         }
     }

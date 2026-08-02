@@ -326,7 +326,33 @@ compliance_cases! {
     case_str_is_empty: "isEmpty('')", Value::Null;
     case_str_is_empty_null: "isEmpty(null)", Value::Null;
     case_q_len: "len($)", json!([1, 2, 3]);
+    // --- upstream test_collections.py ---
+    case_coll_list_empty: "list()", Value::Null;
+    case_coll_list: "list(1, 2, 3)", Value::Null;
+    case_coll_list_nested: "list(1, 2, list(3, 4))", Value::Null;
+    case_coll_dict: "dict(a => 2, 'b c' => 13, 4 => 5, null => null, true => false, 2+6 => 8)", Value::Null;
+    case_coll_indexer_list: "$[0]", json!([1, 2, 3]);
+    case_coll_indexer_list_neg: "$[-1]", json!([1, 2, 3]);
+    case_coll_indexer_dict: "$[a]", json!({"a": 12, "b c": 44});
+    case_coll_indexer_dict_str: "$['b c']", json!({"a": 12, "b c": 44});
+    case_coll_dict_get: "$.get(a)", json!({"a": 12, "b c": 44});
+    case_coll_dict_keys: "$.keys()", json!({"a": 12, "b": 44});
+    case_coll_set: "set(1, 2, 3, 2, 1)", Value::Null;
+    case_coll_dict_expr: "{a => 1}", Value::Null;
+    case_coll_dict_add: "{a => 1} + {b => 2}", Value::Null;
+    case_coll_dict_empty: "{}", Value::Null;
+    case_coll_dict_values: "$.values()", json!({"a": 12, "b": 44});
+    case_coll_list_expr: "[1,2,3]", Value::Null;
+    case_coll_list_expr_empty: "[]", Value::Null;
+    case_coll_list_add: "[1,2] + [3, 4]", Value::Null;
+    case_coll_list_eq: "[c, 55] = [c, 55]", Value::Null;
+    case_coll_list_neq: "[c, 55] != [55, c]", Value::Null;
+    case_coll_dict_eq: "{a => [c, 55]} = {a => [c, 55]}", Value::Null;
+    case_coll_in_list: "5 in [1, 2, 5]", Value::Null;
+    case_coll_contains: "[1, 2, 5].contains(5)", Value::Null;
 }
+
+
 
 
 
@@ -359,30 +385,6 @@ ignored_compliance_cases! {
     case_math_bitwise_xor: "bitwiseXor(1, 3)", Value::Null;
     case_math_shift_left: "shiftBitsLeft(1, 5)", Value::Null;
     case_math_shift_right: "shiftBitsRight(32, 4)", Value::Null;
-    // --- upstream test_collections.py ---
-    case_coll_list_empty: "list()", Value::Null;
-    case_coll_list: "list(1, 2, 3)", Value::Null;
-    case_coll_list_nested: "list(1, 2, list(3, 4))", Value::Null;
-    case_coll_list_expr: "[1,2,3]", Value::Null;
-    case_coll_list_expr_empty: "[]", Value::Null;
-    case_coll_list_add: "[1,2] + [3, 4]", Value::Null;
-    case_coll_dict: "dict(a => 2, 'b c' => 13, 4 => 5, null => null, true => false, 2+6 => 8)", Value::Null;
-    case_coll_dict_expr: "{a => 1}", Value::Null;
-    case_coll_dict_add: "{a => 1} + {b => 2}", Value::Null;
-    case_coll_dict_empty: "{}", Value::Null;
-    case_coll_list_eq: "[c, 55] = [c, 55]", Value::Null;
-    case_coll_list_neq: "[c, 55] != [55, c]", Value::Null;
-    case_coll_dict_eq: "{a => [c, 55]} = {a => [c, 55]}", Value::Null;
-    case_coll_indexer_list: "$[0]", json!([1, 2, 3]);
-    case_coll_indexer_list_neg: "$[-1]", json!([1, 2, 3]);
-    case_coll_indexer_dict: "$[a]", json!({"a": 12, "b c": 44});
-    case_coll_indexer_dict_str: "$['b c']", json!({"a": 12, "b c": 44});
-    case_coll_dict_get: "$.get(a)", json!({"a": 12, "b c": 44});
-    case_coll_dict_keys: "$.keys()", json!({"a": 12, "b": 44});
-    case_coll_dict_values: "$.values()", json!({"a": 12, "b": 44});
-    case_coll_in_list: "5 in [1, 2, 5]", Value::Null;
-    case_coll_contains: "[1, 2, 5].contains(5)", Value::Null;
-    case_coll_set: "set(1, 2, 3, 2, 1)", Value::Null;
     case_coll_set_eq: "set(1, 2, 3) = set(3, 2, 1)", Value::Null;
     // --- upstream test_queries.py ---
     case_q_where: "$.where($ > 3)", json!([1, 2, 3, 4, 5, 6]);

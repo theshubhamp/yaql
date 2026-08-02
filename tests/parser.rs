@@ -1,9 +1,9 @@
 use yaql::ast::Value;
-use yaql::yaql::ValueParser;
+use yaql::parser::Parser;
 
 #[test]
 fn parse_numeric() {
-    let parse_result = ValueParser::new().parse("1");
+    let parse_result = Parser::parse("1");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::IntLiteral(_)));
     match ast {
@@ -11,7 +11,7 @@ fn parse_numeric() {
         _ => panic!("expected IntLiteral"),
     }
 
-    let parse_result = ValueParser::new().parse("-1");
+    let parse_result = Parser::parse("-1");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::IntLiteral(_)));
     match ast {
@@ -19,7 +19,7 @@ fn parse_numeric() {
         _ => panic!("expected IntLiteral"),
     }
 
-    let parse_result = ValueParser::new().parse("1.0");
+    let parse_result = Parser::parse("1.0");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FloatLiteral(_)));
     match ast {
@@ -27,7 +27,7 @@ fn parse_numeric() {
         _ => panic!("expected FloatLiteral"),
     }
 
-    let parse_result = ValueParser::new().parse("-1.1");
+    let parse_result = Parser::parse("-1.1");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FloatLiteral(_)));
     match ast {
@@ -38,7 +38,7 @@ fn parse_numeric() {
 
 #[test]
 fn parse_string() {
-    let parse_result = ValueParser::new().parse("'string'");
+    let parse_result = Parser::parse("'string'");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::StringLiteral(_)));
     match ast {
@@ -46,7 +46,7 @@ fn parse_string() {
         _ => panic!("expected StringLiteral"),
     }
 
-    let parse_result = ValueParser::new().parse("\"string\"");
+    let parse_result = Parser::parse("\"string\"");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::StringLiteral(_)));
     match ast {
@@ -57,7 +57,7 @@ fn parse_string() {
 
 #[test]
 fn parse_boolean() {
-    let parse_result = ValueParser::new().parse("true");
+    let parse_result = Parser::parse("true");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::BooleanLiteral(_)));
     match ast {
@@ -65,7 +65,7 @@ fn parse_boolean() {
         _ => panic!("expected BooleanLiteral"),
     }
 
-    let parse_result = ValueParser::new().parse("false");
+    let parse_result = Parser::parse("false");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::BooleanLiteral(_)));
     match ast {
@@ -76,14 +76,14 @@ fn parse_boolean() {
 
 #[test]
 fn parse_null() {
-    let parse_result = ValueParser::new().parse("null");
+    let parse_result = Parser::parse("null");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::NullLiteral));
 }
 
 #[test]
 fn parse_dollar() {
-    let parse_result = ValueParser::new().parse("$context_Value01");
+    let parse_result = Parser::parse("$context_Value01");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::Dollar(_)));
     match ast {
@@ -94,7 +94,7 @@ fn parse_dollar() {
 
 #[test]
 fn parse_paren() {
-    let parse_result = ValueParser::new().parse("($context_Value01)");
+    let parse_result = Parser::parse("($context_Value01)");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::Dollar(_)));
     match ast {
@@ -105,7 +105,7 @@ fn parse_paren() {
 
 #[test]
 fn parse_function_call() {
-    let parse_result = ValueParser::new().parse("abc(1)");
+    let parse_result = Parser::parse("abc(1)");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FunctionCall(_, _, _)));
     match ast {
@@ -116,7 +116,7 @@ fn parse_function_call() {
         _ => panic!("expected FunctionCall"),
     }
 
-    let parse_result = ValueParser::new().parse("abc(1, true)");
+    let parse_result = Parser::parse("abc(1, true)");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FunctionCall(_, _, _)));
     match ast {
@@ -128,7 +128,7 @@ fn parse_function_call() {
         _ => panic!("expected FunctionCall"),
     }
 
-    let parse_result = ValueParser::new().parse("abc(1, true, 'key' => 'value')");
+    let parse_result = Parser::parse("abc(1, true, 'key' => 'value')");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FunctionCall(_, _, _)));
     match ast {
@@ -140,7 +140,7 @@ fn parse_function_call() {
         _ => panic!("expected FunctionCall"),
     }
 
-    let parse_result = ValueParser::new().parse("abc(1, true, 'key1' => 'value1', 'key2' => 'value2')");
+    let parse_result = Parser::parse("abc(1, true, 'key1' => 'value1', 'key2' => 'value2')");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FunctionCall(_, _, _)));
     match ast {
@@ -155,7 +155,7 @@ fn parse_function_call() {
 
 #[test]
 fn parse_binary_operators() {
-    let parse_result = ValueParser::new().parse("2 + 3");
+    let parse_result = Parser::parse("2 + 3");
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::BinaryOperator(_, _, _)));
     match ast {
