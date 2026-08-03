@@ -1,0 +1,153 @@
+use crate::lang::primitive::{Primitive, as_f64, arith, truthy, primitive_eq};
+
+pub fn add(left: Primitive, right: Primitive) -> Primitive {
+    match (&left, &right) {
+        (Primitive::String(l), Primitive::String(r)) => Primitive::String(format!("{}{}", l, r)),
+        (Primitive::Array(l), Primitive::Array(r)) => {
+            let mut combined = l.clone();
+            combined.extend(r.iter().cloned());
+            Primitive::Array(combined)
+        }
+        (Primitive::Map(l), Primitive::Map(r)) => {
+            let mut combined = l.clone();
+            for (k, v) in r {
+                combined.insert(k.clone(), v.clone());
+            }
+            Primitive::Map(combined)
+        }
+        _ => arith(&left, &right, |a, b| a + b, |a, b| a + b),
+    }
+}
+
+pub fn sub(left: Primitive, right: Primitive) -> Primitive {
+    arith(&left, &right, |a, b| a - b, |a, b| a - b)
+}
+
+pub fn mul(left: Primitive, right: Primitive) -> Primitive {
+    match (&left, &right) {
+        (Primitive::String(s), Primitive::Int(n)) => Primitive::String(s.repeat(*n as usize)),
+        (Primitive::Int(n), Primitive::String(s)) => Primitive::String(s.repeat(*n as usize)),
+        _ => arith(&left, &right, |a, b| a * b, |a, b| a * b),
+    }
+}
+
+pub fn div(left: Primitive, right: Primitive) -> Primitive {
+    arith(&left, &right, |a, b| a / b, |a, b| (a as f64 / b as f64).floor() as i64)
+}
+
+pub fn modulo(left: Primitive, right: Primitive) -> Primitive {
+    arith(&left, &right, |a, b| a % b, |a, b| a - b * (a as f64 / b as f64).floor() as i64)
+}
+
+pub fn and(left: Primitive, right: Primitive) -> Primitive {
+    if !truthy(&left) { return left }
+    right
+}
+
+pub fn or(left: Primitive, right: Primitive) -> Primitive {
+    if truthy(&left) { return left }
+    right
+}
+
+pub fn eq(left: Primitive, right: Primitive) -> Primitive {
+    let result = match (&left, &right) {
+        (Primitive::String(l), Primitive::String(r)) => l == r,
+        (Primitive::Int(l), Primitive::Int(r)) => l == r,
+        (Primitive::Float(l), Primitive::Float(r)) => l == r,
+        (Primitive::Int(l), Primitive::Float(r)) => *l as f64 == *r,
+        (Primitive::Float(l), Primitive::Int(r)) => *l == *r as f64,
+        (Primitive::Boolean(l), Primitive::Boolean(r)) => l == r,
+        (Primitive::Null, Primitive::Null) => true,
+        (Primitive::Array(l), Primitive::Array(r)) => l.len() == r.len() && l.iter().zip(r).all(|(a, b)| primitive_eq(a, b)),
+        (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| primitive_eq(v, rv))),
+        _ => false
+    };
+    Primitive::Boolean(result)
+}
+
+pub fn neq(left: Primitive, right: Primitive) -> Primitive {
+    let Primitive::Boolean(is_eq) = eq(left, right) else { return Primitive::Boolean(true) };
+    Primitive::Boolean(!is_eq)
+}
+
+pub fn lt(left: Primitive, right: Primitive) -> Primitive {
+    let result = match (&left, &right) {
+        (Primitive::Null, Primitive::Null) => false,
+        (Primitive::Null, _) => true,
+        (_, Primitive::Null) => false,
+        _ => match (as_f64(&left), as_f64(&right)) {
+            (Some(l), Some(r)) => l < r,
+            _ => false,
+        },
+    };
+    Primitive::Boolean(result)
+}
+
+pub fn lteq(left: Primitive, right: Primitive) -> Primitive {
+    let Primitive::Boolean(lt_result) = lt(left.clone(), right.clone()) else { return Primitive::Boolean(false) };
+    let Primitive::Boolean(eq_result) = eq(left, right) else { return Primitive::Boolean(false) };
+    Primitive::Boolean(lt_result || eq_result)
+}
+
+pub fn gt(left: Primitive, right: Primitive) -> Primitive {
+    let result = match (&left, &right) {
+        (Primitive::Null, Primitive::Null) => false,
+        (Primitive::Null, _) => false,
+        (_, Primitive::Null) => true,
+        _ => match (as_f64(&left), as_f64(&right)) {
+            (Some(l), Some(r)) => l > r,
+            _ => false,
+        },
+    };
+    Primitive::Boolean(result)
+}
+
+pub fn gteq(left: Primitive, right: Primitive) -> Primitive {
+    let Primitive::Boolean(gt_result) = gt(left.clone(), right.clone()) else { return Primitive::Boolean(false) };
+    let Primitive::Boolean(eq_result) = eq(left, right) else { return Primitive::Boolean(false) };
+    Primitive::Boolean(gt_result || eq_result)
+}
+
+pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
+    let result = match (&left, &right) {
+        (Primitive::String(needle), Primitive::String(haystack)) => haystack.contains(needle.as_str()),
+        (_, Primitive::Array(arr, ..)) => arr.iter().any(|e| matches!(eq(e.clone(), left.clone()), Primitive::Boolean(true))),
+        _ => false,
+    };
+    Primitive::Boolean(result)
+}
+
+pub fn dot_access(left: Primitive, right: Primitive) -> Primitive {
+    match (&left, &right) {
+        (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().unwrap_or(Primitive::Null),
+        _ => Primitive::Null,
+    }
+}
+
+pub struct BinaryOperators;
+
+impl BinaryOperators {
+    pub fn lookup(&self, name: String) -> fn(Primitive, Primitive) -> Primitive {
+        match name.as_str() {
+            "and" => and,
+            "or" => or,
+            "+" => add,
+            "-" => sub,
+            "*" => mul,
+            "/" => div,
+            "mod" => modulo,
+            "=" => eq,
+            "!=" => neq,
+            "<" => lt,
+            "<=" => lteq,
+            ">" => gt,
+            ">=" => gteq,
+            "in" => in_op,
+            "." => dot_access,
+            "?." => dot_access,
+            _ => todo!()
+        }
+    }
+}
+
+pub static BINARY_OPERATORS: BinaryOperators = BinaryOperators {};

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::ast::{Value, Visitor};
-use crate::lang::{truthy, BINARY_OPERATORS, FUNCTIONS, Primitive};
+use crate::lang::{truthy, ArgSpec, BINARY_OPERATORS, FUNCTIONS, Primitive, Spec};
 
 pub struct Interpreter {
     pub context: Primitive,
@@ -54,52 +54,44 @@ impl Visitor<Option<Primitive>> for Interpreter {
     }
 
     fn visit_function_call(&self, identifier: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> Option<Primitive> {
-        let mut arg_values = Vec::new();
-        for arg in args {
-            arg_values.push(self.visit(arg).unwrap());
-        }
-
-        let mut kwarg_values = Vec::new();
-        for (kwarg_key, kwarg_value) in kwargs {
-            kwarg_values.push((self.visit(kwarg_key).unwrap(), self.visit(kwarg_value).unwrap()));
-        }
-
-        return Some(FUNCTIONS.lookup(identifier)(arg_values, kwarg_values));
+        let overloads = FUNCTIONS.lookup(identifier);
+        let arg_values: Vec<Primitive> = args.into_iter().filter_map(|a| self.visit(a)).collect();
+        let kwarg_values: Vec<(Primitive, Primitive)> = kwargs.into_iter()
+            .filter_map(|(k, v)| {
+                let k = self.visit(k)?;
+                let v = self.visit(v)?;
+                Some((k, v))
+            })
+            .collect();
+        Some(dispatch(overloads, arg_values, kwarg_values))
     }
 
     fn visit_binary_operator(&self, left: Value, op: String, right: Value) -> Option<Primitive> {
-        let left_value = self.visit(left);
-        let right_value = self.visit(right);
-
-        if left_value.is_none() || right_value.is_none() {
-            return None;
-        }
-
-        let left_value = left_value.unwrap();
-        let right_value = right_value.unwrap();
-
-        return Some(BINARY_OPERATORS.lookup(op)(left_value, right_value));
+        let left_value = self.visit(left)?;
+        let right_value = self.visit(right)?;
+        Some(BINARY_OPERATORS.lookup(op)(left_value, right_value))
     }
 
     fn visit_method_call(&self, receiver: Value, optional: bool, method: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> Option<Primitive> {
         let receiver_value = self.visit(receiver)?;
 
-        // ?. returns null if receiver is null, . raises an error
         if optional && matches!(receiver_value, Primitive::Null) {
             return Some(Primitive::Null);
         }
 
+        let overloads = FUNCTIONS.lookup(method);
         let mut arg_values = vec![receiver_value];
         for arg in args {
             arg_values.push(self.visit(arg)?);
         }
-
-        let mut kwarg_values = Vec::new();
-        for (k, v) in kwargs {
-            kwarg_values.push((self.visit(k)?, self.visit(v)?));
-        }
-
-        return Some(FUNCTIONS.lookup(method)(arg_values, kwarg_values));
+        let kwarg_values: Vec<(Primitive, Primitive)> = kwargs.into_iter()
+            .filter_map(|(k, v)| {
+                let k = self.visit(k)?;
+                let v = self.visit(v)?;
+                Some((k, v))
+            })
+            .collect();
+        Some(dispatch(overloads, arg_values, kwarg_values))
     }
 
     fn visit_unary_operator(&self, op: String, operand: Value) -> Option<Primitive> {
@@ -152,6 +144,51 @@ impl Visitor<Option<Primitive>> for Interpreter {
             _ => None,
         }
     }
+}
+
+/// Find the best matching overload and call it.
+/// Overloads are sorted by specificity (exact type matches first, Any/Number last).
+fn dispatch(overloads: Vec<Spec>, args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let mut overloads = overloads;
+    // Sort by specificity score (lower = more specific = tried first)
+    overloads.sort_by_key(|s| {
+        s.arg_types.iter().map(|ty| match ty {
+            crate::lang::Type::Any => 3,
+            crate::lang::Type::Number => 2,
+            _ => 0,
+        }).sum::<u32>()
+    });
+    for spec in &overloads {
+        if !spec.kwargs && !kwargs.is_empty() {
+            continue;
+        }
+        let arg_count_ok = match spec.args {
+            ArgSpec::Exact(n) => args.len() == n,
+            ArgSpec::Min(n) => args.len() >= n,
+            ArgSpec::Varargs => true,
+        };
+        if !arg_count_ok {
+            continue;
+        }
+        let types_ok = spec.arg_types.iter().enumerate()
+            .all(|(i, ty)| i >= args.len() || ty.matches(&args[i]));
+        if !types_ok {
+            continue;
+        }
+        return (spec.func)(args, kwargs);
+    }
+    // No overload matched — try to find one for error reporting
+    if let Some(spec) = overloads.first() {
+        // Validate against first spec for a useful panic message
+        if !spec.kwargs { assert_eq!(kwargs.len(), 0); }
+        match spec.args {
+            ArgSpec::Exact(n) => assert_eq!(args.len(), n),
+            ArgSpec::Min(n) => assert!(args.len() >= n),
+            ArgSpec::Varargs => {}
+        }
+        return (spec.func)(args, kwargs);
+    }
+    Primitive::Null
 }
 
 fn unquote(raw: &str) -> String {
