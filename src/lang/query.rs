@@ -75,3 +75,19 @@ pub fn sum(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primit
 }
 yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Array], false);
 yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Set], false);
+
+pub fn split_at_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
+    let pos = match &args[1] {
+        Primitive::Int(n) => {
+            let len = arr.len() as i64;
+            if *n < 0 { ((len + n).max(0)) as usize } else { (*n as usize).min(arr.len()) }
+        }
+        _ => return Primitive::Null,
+    };
+    Primitive::Array(vec![
+        Primitive::Array(arr[..pos].to_vec()),
+        Primitive::Array(arr[pos..].to_vec()),
+    ])
+}
+yaql_raw_function!("splitAt", split_at_fn, ArgSpec::Exact(2), [Type::Array, Type::Int], false);

@@ -529,6 +529,98 @@ compliance_cases! {
     case_q_is_iterable_empty: "isIterable([])", Value::Null;
     case_q_is_iterable_list: "isIterable([1,2])", Value::Null;
     case_q_is_iterable_num: "isIterable(1)", Value::Null;
+
+    // ========================================================================= //
+    // String methods
+    // ========================================================================= //
+    case_split: "$.split('\\n')", json!("some\ntext");
+    case_rsplit: "$.rightSplit('\\n', 1)", json!("one\ntwo\nthree");
+    case_join: "[some, text].join('-')", Value::Null;
+    case_join_pythonic: "'-'.join([some, text])", Value::Null;
+    case_norm_empty: "norm('')", Value::Null;
+    case_norm_null: "norm(null)", Value::Null;
+    case_norm_spaces: "norm('  ')", Value::Null;
+    case_norm_x: "norm('  x')", Value::Null;
+    case_replace: "ABBD.replace(B, x)", Value::Null;
+    case_replace_count: "ABxD.replace(B, x, 1)", Value::Null;
+    case_replace_dict: "AxyD.replace({x => z, y => 1})", Value::Null;
+    case_replace_dict_count: "\"A122Dnull\".replace({1 => \"y\", 2 => \"false\", null => \"!\"}, 1)", Value::Null;
+    case_trim: "'  x  '.trim()", Value::Null;
+    case_trim_chars: "'abxba'.trim(ab)", Value::Null;
+    case_trim_left: "'  x  '.trimLeft()", Value::Null;
+    case_trim_left_chars: "'abxba'.trimLeft(ab)", Value::Null;
+    case_trim_right: "'  x  '.trimRight()", Value::Null;
+    case_trim_right_chars: "'abxba'.trimRight(ab)", Value::Null;
+    case_substring_2: "$.substring(2)", json!("abcdef");
+    case_substring_neg2: "$.substring(-2)", json!("abcdef");
+    case_substring_2_3: "$.substring(2, 3)", json!("abcdef");
+    case_substring_neg3_2: "$.substring(-3, 2)", json!("abcdef");
+    case_substring_1_neg1: "$.substring(1, -1)", json!("abcdef");
+    case_substring_neg5_neg1: "$.substring(-5, -1)", json!("abcdef");
+    case_index_of_c: "$.indexOf(c)", json!("abcdefedcba");
+    case_index_of_c_2: "$.indexOf(c, 2)", json!("abcdefedcba");
+    case_index_of_x: "$.indexOf(x)", json!("abcdefedcba");
+    case_index_of_f_3: "$.indexOf(f, 3)", json!("abcdefedcba");
+    case_index_of_dcb_neg4_3: "$.indexOf(dcb, -4, 3)", json!("abcdefedcba");
+    case_index_of_dcb_neg4_100: "$.indexOf(dcb, -4, 100)", json!("abcdefedcba");
+    case_index_of_dcb_0_5: "$.indexOf(dcb, 0, 5)", json!("abcdefedcba");
+    case_last_index_of_c: "$.lastIndexOf(c)", json!("abcdefedcbabc");
+    case_last_index_of_c_0_4: "$.lastIndexOf(c, 0, 4)", json!("abcdefedcbabc");
+    case_last_index_of_c_3_4: "$.lastIndexOf(c, 3, 4)", json!("abcdefedcbabc");
+    case_last_index_of_c_neg1_1: "$.lastIndexOf(c, -1, 1)", json!("abcdefedcbabc");
+    case_starts_with_2arg: "ABC.startsWith(B, A)", Value::Null;
+    case_ends_with_2arg: "ABC.endsWith(B, C)", Value::Null;
+
+    // ========================================================================= //
+    // Dict/list mutation
+    // ========================================================================= //
+    case_dict_set: "$.set(a, 99).set(x, null)", json!({"a": 12, "b c": 44});
+    case_dict_set_many: "$.set(dict(a => 55, \"d x\" => 99, null => null))", json!({"a": 12, "b c": 44});
+    case_dict_set_many_inline: "$.set(a => 55, \"d x\" => 99)", json!({"a": 12, "b c": 44});
+    case_dict_items: "$.items()", json!({"a": 12, "b": 44});
+    case_dict_items_roundtrip: "dict($.items())", json!({"a": 12, "b": 44});
+    case_dict_from_seq: "dict(list(list(a, 1), list('b', 2)))", Value::Null;
+    case_index_dict_default: "$[c, 55]", json!({"a": 12, "b c": 44});
+    case_index_dict_kw_default: "$[c, default => 66]", json!({"a": 12, "b c": 44});
+    case_dict_get_2arg: "$.get(c, 50)", json!({"a": 12, "b c": 44});
+    case_delete_dict: "$.delete(b, c)", json!({"a": 1, "b": 2, "c": 3, "d": 4});
+    case_delete_all: "$.deleteAll([b, c])", json!({"a": 1, "b": 2, "c": 3, "d": 4});
+    case_contains_key: "$.containsKey(a)", json!({"a": 12, "b": 44});
+    case_contains_value: "$.values().contains(44)", json!({"a": 12, "b": 44});
+    case_to_list_gen: "$.toList()", json!([0, 1, 2]);
+    case_to_list_list: "$.toList()", json!([0, 1, 2]);
+
+    // ========================================================================= //
+    // List operations
+    // ========================================================================= //
+    case_list_mul_3: "3 * [1, 2]", Value::Null;
+    case_list_mul_rev: "[1, 2] * 3", Value::Null;
+    case_delete_0: "[1, 2, 3, 4].delete(0)", Value::Null;
+    case_delete_0_2: "[1, 2, 3, 4].delete(0, 2)", Value::Null;
+    case_delete_chain: "[1, 2, 3, 4].delete(0, 2).delete(0)", Value::Null;
+    case_delete_1_neg1: "[1, 2, 3, 4].delete(1, -1)", Value::Null;
+    case_delete_0_0: "[1, 2, 3, 4].delete(0, 0)", Value::Null;
+    case_delete_0_neg1: "[1, 2, 3, 4].delete(0, -1)", Value::Null;
+    case_insert_1_a: "[1, 2].insert(1, a)", Value::Null;
+    case_insert_1_list: "[1, 2].insert(1, [a, b])", Value::Null;
+    case_insert_neg1_a: "[1, 2].insert(-1, a)", Value::Null;
+    case_insert_100_a: "[1, 2].insert(100, a)", Value::Null;
+    case_insert_chain: "[].insert(0, a).insert(0, b)", Value::Null;
+    case_insert_many_1: "[1, 2].insertMany(1, [a, b])", Value::Null;
+    case_insert_many_neg1: "[1, 2].insertMany(-1, [a, b])", Value::Null;
+    case_insert_many_100: "[1, 2].insertMany(100, [a, b])", Value::Null;
+    case_insert_many_chain: "[].insertMany(0, [a, b]).insertMany(1, [a, b])", Value::Null;
+    case_list_replace_0_null: "[1, 2, 3, 4].replace(0, null)", Value::Null;
+    case_list_replace_0_null_2: "[1, 2, 3, 4].replace(0, null, 2)", Value::Null;
+    case_list_replace_1_7_neg1: "[1, 2, 3, 4].replace(1, 7, -1)", Value::Null;
+    case_replace_many_0: "[1, 2, 3, 4].replaceMany(0, [7, 8])", Value::Null;
+    case_replace_many_0_2: "[1, 2, 3, 4].replaceMany(0, [7, 8], 2)", Value::Null;
+    case_replace_many_1_neg1: "[1, 2, 3, 4].replaceMany(1, [7, 8], -1)", Value::Null;
+    case_list_index_of: "[1, 2, 3, 2, 1].indexOf(2)", Value::Null;
+    case_list_index_of_22: "[1, 2, 3, 2, 1].indexOf(22)", Value::Null;
+    case_list_last_index_of: "[1, 2, 3, 2, 1].lastIndexOf(2)", Value::Null;
+    case_list_last_index_of_22: "[1, 2, 3, 2, 1].lastIndexOf(22)", Value::Null;
+    case_split_at: "range(1, 6).splitAt(2)", Value::Null;
 }
 
 ignored_compliance_cases! {
@@ -570,93 +662,16 @@ ignored_compliance_cases! {
     case_ignored_bitwise_not: "bitwiseNot(1)", Value::Null;
 
     // test_strings.py — split, join, norm, replace, trim, substring, indexOf, characters
-    case_ignored_split: "$.split('\\n')", json!("some\ntext");
-    case_ignored_rsplit: "$.rightSplit('\\n', 1)", json!("one\ntwo\nthree");
-    case_ignored_join: "[some, text].join('-')", Value::Null;
-    case_ignored_join_pythonic: "'-'.join([some, text])", Value::Null;
     case_ignored_join_seq: "[text, 1, null, true].select(str($)).join('-')", Value::Null;
-    case_ignored_norm_empty: "norm('')", Value::Null;
-    case_ignored_norm_null: "norm(null)", Value::Null;
-    case_ignored_norm_spaces: "norm('  ')", Value::Null;
-    case_ignored_norm_x: "norm('  x')", Value::Null;
-    case_ignored_replace: "ABBD.replace(B, x)", Value::Null;
-    case_ignored_replace_count: "ABxD.replace(B, x, 1)", Value::Null;
-    case_ignored_replace_dict: "AxyD.replace({x => z, y => 1})", Value::Null;
-    case_ignored_replace_dict_count: "A122Dnull.replace({1 => y, 2 => false, null => '!'}, 1)", Value::Null;
-    case_ignored_trim: "'  x  '.trim()", Value::Null;
-    case_ignored_trim_chars: "'abxba'.trim(ab)", Value::Null;
-    case_ignored_trim_left: "'  x  '.trimLeft()", Value::Null;
-    case_ignored_trim_left_chars: "'abxba'.trimLeft(ab)", Value::Null;
-    case_ignored_trim_right: "'  x  '.trimRight()", Value::Null;
-    case_ignored_trim_right_chars: "'abxba'.trimRight(ab)", Value::Null;
-    case_ignored_substring_2: "$.substring(2)", json!("abcdef");
-    case_ignored_substring_neg2: "$.substring(-2)", json!("abcdef");
-    case_ignored_substring_2_3: "$.substring(2, 3)", json!("abcdef");
-    case_ignored_substring_neg3_2: "$.substring(-3, 2)", json!("abcdef");
-    case_ignored_substring_1_neg1: "$.substring(1, -1)", json!("abcdef");
-    case_ignored_substring_neg5_neg1: "$.substring(-5, -1)", json!("abcdef");
-    case_ignored_index_of_c: "$.indexOf(c)", json!("abcdefedcba");
-    case_ignored_index_of_c_2: "$.indexOf(c, 2)", json!("abcdefedcba");
-    case_ignored_index_of_x: "$.indexOf(x)", json!("abcdefedcba");
-    case_ignored_index_of_f_3: "$.indexOf(f, 3)", json!("abcdefedcba");
-    case_ignored_index_of_dcb_neg4_3: "$.indexOf(dcb, -4, 3)", json!("abcdefedcba");
-    case_ignored_index_of_dcb_neg4_100: "$.indexOf(dcb, -4, 100)", json!("abcdefedcba");
-    case_ignored_index_of_dcb_0_5: "$.indexOf(dcb, 0, 5)", json!("abcdefedcba");
-    case_ignored_last_index_of_c: "$.lastIndexOf(c)", json!("abcdefedcbabc");
-    case_ignored_last_index_of_c_0_4: "$.lastIndexOf(c, 0, 4)", json!("abcdefedcbabc");
-    case_ignored_last_index_of_c_3_4: "$.lastIndexOf(c, 3, 4)", json!("abcdefedcbabc");
-    case_ignored_last_index_of_c_neg1_1: "$.lastIndexOf(c, -1, 1)", json!("abcdefedcbabc");
     case_ignored_characters: "characters(octdigits => true, digits => true)", Value::Null;
-    case_ignored_starts_with_2arg: "ABC.startsWith(B, A)", Value::Null;
-    case_ignored_ends_with_2arg: "ABC.endsWith(B, C)", Value::Null;
 
     // test_collections.py — unimplemented features
-    case_ignored_to_list_gen: "$.toList()", json!([0, 1, 2]);
-    case_ignored_to_list_list: "$.toList()", json!([0, 1, 2]);
-    case_ignored_dict_set: "$.set(a, 99).set(x, null)", json!({"a": 12, "b c": 44});
-    case_ignored_dict_set_many: "$.set(dict(a => 55, \"d x\" => 99, null => null))", json!({"a": 12, "b c": 44});
-    case_ignored_dict_set_many_inline: "$.set(a => 55, \"d x\" => 99)", json!({"a": 12, "b c": 44});
-    case_ignored_dict_items: "$.items()", json!({"a": 12, "b": 44});
-    case_ignored_dict_items_roundtrip: "dict($.items())", json!({"a": 12, "b": 44});
-    case_ignored_dict_from_seq: "dict(list(list(a, 1), list('b', 2)))", Value::Null;
     case_ignored_to_dict: "$.toDict($, $*$)", json!([1, 2, 3]);
-    case_ignored_index_dict_default: "$[c, 55]", json!({"a": 12, "b c": 44});
-    case_ignored_index_dict_kw_default: "$[c, default => 66]", json!({"a": 12, "b c": 44});
-    case_ignored_list_mul_3: "3 * [1, 2]", Value::Null;
-    case_ignored_list_mul_rev: "[1, 2] * 3", Value::Null;
-    case_ignored_delete_0: "[1, 2, 3, 4].delete(0)", Value::Null;
-    case_ignored_delete_0_2: "[1, 2, 3, 4].delete(0, 2)", Value::Null;
-    case_ignored_delete_chain: "[1, 2, 3, 4].delete(0, 2).delete(0)", Value::Null;
-    case_ignored_delete_1_neg1: "[1, 2, 3, 4].delete(1, -1)", Value::Null;
-    case_ignored_delete_0_0: "[1, 2, 3, 4].delete(0, 0)", Value::Null;
-    case_ignored_delete_0_neg1: "[1, 2, 3, 4].delete(0, -1)", Value::Null;
-    case_ignored_insert_1_a: "[1, 2].insert(1, a)", Value::Null;
-    case_ignored_insert_1_list: "[1, 2].insert(1, [a, b])", Value::Null;
-    case_ignored_insert_neg1_a: "[1, 2].insert(-1, a)", Value::Null;
-    case_ignored_insert_100_a: "[1, 2].insert(100, a)", Value::Null;
-    case_ignored_insert_chain: "[].insert(0, a).insert(0, b)", Value::Null;
-    case_ignored_insert_many_1: "[1, 2].insertMany(1, [a, b])", Value::Null;
-    case_ignored_insert_many_neg1: "[1, 2].insertMany(-1, [a, b])", Value::Null;
-    case_ignored_insert_many_100: "[1, 2].insertMany(100, [a, b])", Value::Null;
-    case_ignored_insert_many_chain: "[].insertMany(0, [a, b]).insertMany(1, [a, b])", Value::Null;
-    case_ignored_list_replace_0_null: "[1, 2, 3, 4].replace(0, null)", Value::Null;
-    case_ignored_list_replace_0_null_2: "[1, 2, 3, 4].replace(0, null, 2)", Value::Null;
-    case_ignored_list_replace_1_7_neg1: "[1, 2, 3, 4].replace(1, 7, -1)", Value::Null;
-    case_ignored_replace_many_0: "[1, 2, 3, 4].replaceMany(0, [7, 8])", Value::Null;
-    case_ignored_replace_many_0_2: "[1, 2, 3, 4].replaceMany(0, [7, 8], 2)", Value::Null;
-    case_ignored_replace_many_1_neg1: "[1, 2, 3, 4].replaceMany(1, [7, 8], -1)", Value::Null;
-    case_ignored_delete_dict: "$.delete(b, c)", json!({"a": 1, "b": 2, "c": 3, "d": 4});
-    case_ignored_delete_all: "$.deleteAll([b, c])", json!({"a": 1, "b": 2, "c": 3, "d": 4});
-    case_ignored_set_from_iter: "set([1, 2, 3].select($))", Value::Null;
-    case_ignored_to_set_iter: "[1, 2, 3].select($).toSet()", Value::Null;
-    case_ignored_dict_get_2arg: "$.get(c, 50)", json!({"a": 12, "b c": 44});
     case_ignored_dict_list_key: "dict($ => 3).get($)", json!([1, 2]);
     case_ignored_dict_list_key_nested: "dict($ => 3).get($)", json!([1, [2]]);
     case_ignored_dict_dict_key: "dict($ => 3).get($)", json!({"a": 1});
     case_ignored_dict_eq_list_key_diff: "{[c, 55] => a} = {[c, 56] => a}", Value::Null;
     case_ignored_dict_neq_list_key_diff: "{[c, 55] => a} != {[c, 56] => a}", Value::Null;
-    case_ignored_contains_key: "$.containsKey(a)", json!({"a": 12, "b": 44});
-    case_ignored_contains_value: "$.values().contains(44)", json!({"a": 12, "b": 44});
     case_ignored_contains_key_null: "$.containsKey(null)", json!({"a": 12, "b": 44});
     case_ignored_contains_select: "$.values().select(2*$).contains(24)", json!({"a": 12, "b": 44});
     case_ignored_in_select: "24 in $.values().select(2*$)", json!({"a": 12, "b": 44});
@@ -724,10 +739,6 @@ ignored_compliance_cases! {
     case_ignored_cycle: "[1, 2].cycle().take(5)", Value::Null;
     case_ignored_take_while: "[1, 2, 3, 4, 5].takeWhile($ < 4)", Value::Null;
     case_ignored_skip_while: "[1, 2, 3, 4, 5].skipWhile($ < 4)", Value::Null;
-    case_ignored_list_index_of: "[1, 2, 3, 2, 1].indexOf(2)", Value::Null;
-    case_ignored_list_index_of_22: "[1, 2, 3, 2, 1].indexOf(22)", Value::Null;
-    case_ignored_list_last_index_of: "[1, 2, 3, 2, 1].lastIndexOf(2)", Value::Null;
-    case_ignored_list_last_index_of_22: "[1, 2, 3, 2, 1].lastIndexOf(22)", Value::Null;
     case_ignored_index_where: "[1, 2, 3, 2, 1].indexWhere($ = 2)", Value::Null;
     case_ignored_index_where_22: "[1, 2, 3, 2, 1].indexWhere($ = 22)", Value::Null;
     case_ignored_last_index_where: "[1, 2, 3, 2, 1].lastIndexWhere($ = 2)", Value::Null;
@@ -735,7 +746,6 @@ ignored_compliance_cases! {
     case_ignored_slice_range: "range(1, 6).slice(2)", Value::Null;
     case_ignored_slice_list: "[1,2,3,4,5].slice(2)", Value::Null;
     case_ignored_split_where: "range(1, 6).splitWhere($ mod 3 = 1)", Value::Null;
-    case_ignored_split_at: "range(1, 6).splitAt(2)", Value::Null;
     case_ignored_slice_where: "[a,a,b,a,a].sliceWhere($ != a)", Value::Null;
     case_ignored_aggregate: "[a,a,b,a,a].aggregate($1 + $2)", Value::Null;
     case_ignored_aggregate_init: "[].aggregate($1 + $2, 1)", Value::Null;

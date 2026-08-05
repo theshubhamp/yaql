@@ -177,6 +177,10 @@ impl IntoPrimitive for bool {
     fn into_primitive(self) -> Primitive { Primitive::Boolean(self) }
 }
 
+impl IntoPrimitive for Null {
+    fn into_primitive(self) -> Primitive { Primitive::Null }
+}
+
 impl IntoPrimitive for Vec<Primitive> {
     fn into_primitive(self) -> Primitive { Primitive::Array(self) }
 }

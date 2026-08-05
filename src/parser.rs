@@ -194,7 +194,7 @@ impl<'input> Parser<'input> {
             match self.peek_tok()? {
                 Some(Tok::Dot) => {
                     self.advance()?;
-                    let right = self.parse_or()?;
+                    let right = self.parse_method_target()?;
                     left = match right {
                         Value::FunctionCall(name, args, kwargs) => {
                             Value::MethodCall(Box::new(left), false, name, args, kwargs)
@@ -204,7 +204,7 @@ impl<'input> Parser<'input> {
                 }
                 Some(Tok::QuestionDot) => {
                     self.advance()?;
-                    let right = self.parse_or()?;
+                    let right = self.parse_method_target()?;
                     left = match right {
                         Value::FunctionCall(name, args, kwargs) => {
                             Value::MethodCall(Box::new(left), true, name, args, kwargs)
@@ -290,17 +290,53 @@ impl<'input> Parser<'input> {
         }
     }
 
+    fn parse_method_target(&mut self) -> Result<Value, ParseError> {
+        match self.peek_tok()? {
+            Some(Tok::FunctionName(name)) => {
+                let name = name.to_string();
+                self.advance()?;
+                self.expect(&Tok::LParen)?;
+                let (args, kwargs) = self.parse_arg_list()?;
+                self.expect(&Tok::RParen)?;
+                Ok(Value::FunctionCall(name, args, kwargs))
+            }
+            Some(Tok::Identifier(s)) => {
+                let s = s.to_string();
+                self.advance()?;
+                Ok(Value::StringLiteral(s))
+            }
+            Some(t) => Err(ParseError { msg: format!("Unexpected token `{}`", t) }),
+            None => Err(ParseError { msg: "Unexpected EOF".to_string() }),
+        }
+    }
+
     /// Comma-separated list of Values, stopping at closing bracket.
     fn parse_comma_list(&mut self) -> Result<Vec<Value>, ParseError> {
         let mut items = Vec::new();
         if self.is_closing()? { return Ok(items); }
-        items.push(self.parse_value()?);
+        let first = self.parse_value()?;
+        match self.peek_tok()? {
+            Some(Tok::MappingArrow) => {
+                self.advance()?;
+                let val = self.parse_value()?;
+                items.push(Value::BinaryOperator(Box::new(first), "=>".to_string(), Box::new(val)));
+            }
+            _ => { items.push(first); }
+        }
         loop {
             match self.peek_tok()? {
                 Some(Tok::Comma) => {
                     self.advance()?;
                     if self.is_closing()? { break; }
-                    items.push(self.parse_value()?);
+                    let key_or_arg = self.parse_value()?;
+                    match self.peek_tok()? {
+                        Some(Tok::MappingArrow) => {
+                            self.advance()?;
+                            let val = self.parse_value()?;
+                            items.push(Value::BinaryOperator(Box::new(key_or_arg), "=>".to_string(), Box::new(val)));
+                        }
+                        _ => { items.push(key_or_arg); }
+                    }
                 }
                 _ => break,
             }

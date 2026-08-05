@@ -48,6 +48,12 @@ pub fn mul(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::String(s), Primitive::Int(n)) => Primitive::String(s.repeat(*n as usize)),
         (Primitive::Int(n), Primitive::String(s)) => Primitive::String(s.repeat(*n as usize)),
+        (Primitive::Array(a), Primitive::Int(n)) => {
+            Primitive::Array((0..*n).flat_map(|_| a.iter().cloned()).collect())
+        }
+        (Primitive::Int(n), Primitive::Array(a)) => {
+            Primitive::Array((0..*n).flat_map(|_| a.iter().cloned()).collect())
+        }
         _ => arith(&left, &right, |a, b| a * b, |a, b| a * b),
     }
 }
@@ -194,6 +200,7 @@ impl BinaryOperators {
             "in" => in_op,
             "." => dot_access,
             "?." => dot_access,
+            "=>" => |_, _| Primitive::Null,
             _ => todo!()
         }
     }

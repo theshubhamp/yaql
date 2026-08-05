@@ -133,20 +133,42 @@ impl Visitor<Option<Primitive>> for Interpreter {
 
     fn visit_index(&self, collection: Value, indices: Vec<Value>) -> Option<Primitive> {
         let coll = self.visit(collection)?;
-        let idx = self.visit(indices.into_iter().next()?)?;
+        let mut idx_values: Vec<Primitive> = Vec::new();
+        for v in indices {
+            if let Value::BinaryOperator(left, op, right) = v {
+                if op == "=>" {
+                    let key = self.visit(*left)?;
+                    let val = self.visit(*right)?;
+                    if let Primitive::String(k) = &key {
+                        if let Primitive::Map(map) = &coll {
+                            if let Some(v) = map.get(k) {
+                                return Some(v.clone());
+                            }
+                        }
+                    }
+                    return Some(val);
+                }
+                idx_values.push(self.visit(Value::BinaryOperator(left, op, right))?);
+            } else {
+                idx_values.push(self.visit(v)?);
+            }
+        }
+        let idx = idx_values.first()?.clone();
+        let default = idx_values.get(1).cloned();
         match (&coll, &idx) {
             (Primitive::Array(arr), Primitive::Int(i)) => {
                 let len = arr.len() as i64;
                 let pos = if *i < 0 { *i + len } else { *i };
-                arr.get(pos as usize).cloned()
+                arr.get(pos as usize).cloned().or(default)
             }
             (Primitive::Set(arr), Primitive::Int(i)) => {
                 let len = arr.len() as i64;
                 let pos = if *i < 0 { *i + len } else { *i };
-                arr.get(pos as usize).cloned()
+                arr.get(pos as usize).cloned().or(default)
             }
-            (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned(),
-            _ => None,
+            (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().or(default),
+            (Primitive::Map(map), Primitive::Int(i)) => map.get(&i.to_string()).cloned().or(default),
+            _ => default,
         }
     }
 }
@@ -156,14 +178,24 @@ impl Visitor<Option<Primitive>> for Interpreter {
 fn dispatch(overloads: Vec<Spec>, args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let mut overloads = overloads;
     // Sort by specificity score (lower = more specific = tried first)
-    overloads.sort_by_key(|s| {
-        s.arg_types.iter().map(|ty| match ty {
-            crate::lang::Type::Any => 3,
-            crate::lang::Type::Number => 2,
-            _ => 0,
-        }).sum::<u32>()
+    overloads.sort_by(|a, b| {
+        let score = |s: &Spec| {
+            s.arg_types.iter().map(|ty| match ty {
+                crate::lang::Type::Any => 3,
+                crate::lang::Type::Number => 2,
+                _ => 0,
+            }).sum::<u32>()
+        };
+        let sa = score(a);
+        let sb = score(b);
+        sa.cmp(&sb).then_with(|| {
+            b.arg_types.len().cmp(&a.arg_types.len())
+        })
     });
-    for spec in &overloads {
+    let typed: Vec<&Spec> = overloads.iter().filter(|s| !s.arg_types.is_empty()).collect();
+    let untyped: Vec<&Spec> = overloads.iter().filter(|s| s.arg_types.is_empty()).collect();
+    let ordered: Vec<&Spec> = typed.into_iter().chain(untyped.into_iter()).collect();
+    for spec in &ordered {
         if !spec.kwargs && !kwargs.is_empty() {
             continue;
         }
