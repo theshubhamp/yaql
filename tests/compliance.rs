@@ -472,6 +472,38 @@ compliance_cases! {
     case_coll_set_len_method: "set(1, 2, 3).len()", Value::Null;
     case_coll_set_len_fn: "len(set(1, 2, 3))", Value::Null;
 
+    // Set operations
+    case_set_eq: "set(1, 2, 3) = set(3, 2, 1)", Value::Null;
+    case_set_neq: "set(1, 2, 3) != set(1, 2, 3, 4)", Value::Null;
+    case_to_set_list: "[1, 2, 3].toSet()", Value::Null;
+    case_set_union: "set(1, 2, 3).union(set(4, 2, 3))", Value::Null;
+    case_set_add_4: "set(1, 2, 3).add(4)", Value::Null;
+    case_set_addition: "set(1, 2, 3) + set(4, 2, 3)", Value::Null;
+    case_set_lt: "set(1, 2, 3) < set(1, 2, 3, 4)", Value::Null;
+    case_set_lt_false: "set(1, 2, 3) < set(1, 2, 5)", Value::Null;
+    case_set_gt: "set(1, 2, 3, 4) > set(1, 2, 3)", Value::Null;
+    case_set_gt_false: "set(1, 2, 3) > set(1, 2, 3)", Value::Null;
+    case_set_gte_false: "set(1, 2, 4) >= set(1, 2, 3)", Value::Null;
+    case_set_gte: "set(1, 2, 3) >= set(1, 2, 3)", Value::Null;
+    case_set_lte_false: "set(1, 2, 3) <= set(1, 2, 4)", Value::Null;
+    case_set_lte: "set(1, 2, 3) <= set(1, 2, 3)", Value::Null;
+    case_set_difference: "set(1, 2, 3, 4).difference(set(2, 3))", Value::Null;
+    case_set_subtraction: "set(1, 2, 3, 4) - set(2, 3)", Value::Null;
+    case_set_symmetric_diff: "set(1, 2, 3, 4).symmetricDifference(set(2, 3, 5))", Value::Null;
+    case_set_add_4_5: "set(1, 2, 3).add(4, 5)", Value::Null;
+    case_set_add_list: "set(1, 2, 3).add([1, 2])", Value::Null;
+    case_set_add_null: "set(1, 2, 3).add(4, 5, null)", Value::Null;
+    case_set_remove_2: "set(1, 2, 3).remove(2)", Value::Null;
+    case_set_remove_multi: "set(1, 2, null, 3).remove(1, 2, 5)", Value::Null;
+    case_set_remove_null: "set(1, 2, null, 3).remove(1, 2, 5, null)", Value::Null;
+    case_set_remove_list: "set(1, 2, 3, [1, 2]).remove([1, 2])", Value::Null;
+    case_set_contains: "set(1, 2, 3).contains(2)", Value::Null;
+    case_is_set: "isSet(set(1, 2, 3))", Value::Null;
+    case_is_set_false: "isSet([1, 2, 3])", Value::Null;
+    case_is_iterable_set: "isIterable(set(1,2))", Value::Null;
+    case_is_iterable_str: "isIterable(\"foo\")", Value::Null;
+    case_is_iterable_dict: "isIterable({\"a\" => 1})", Value::Null;
+
     // ========================================================================= //
     // test_queries.py
     // ========================================================================= //
@@ -519,10 +551,6 @@ ignored_compliance_cases! {
     case_ignored_unary_plus_sub: "3-+1", Value::Null;
     case_ignored_unary_plus_plus: "3++1", Value::Null;
     case_ignored_unary_plus_float: "3.2 - +1.1", Value::Null;
-
-    // Set equality (reference CLI serializes sets differently)
-    case_ignored_set_eq: "set(1, 2, 3) = set(3, 2, 1)", Value::Null;
-    case_ignored_set_neq: "set(1, 2, 3) != set(1, 2, 3, 4)", Value::Null;
 
     // test_branching.py — switchCase not yet implemented
     case_ignored_switch_case_0: "$.switchCase('a', 'b', 'c')", json!(0);
@@ -621,29 +649,6 @@ ignored_compliance_cases! {
     case_ignored_delete_all: "$.deleteAll([b, c])", json!({"a": 1, "b": 2, "c": 3, "d": 4});
     case_ignored_set_from_iter: "set([1, 2, 3].select($))", Value::Null;
     case_ignored_to_set_iter: "[1, 2, 3].select($).toSet()", Value::Null;
-    case_ignored_to_set_list: "[1, 2, 3].toSet()", Value::Null;
-    case_ignored_set_union: "set(1, 2, 3).union(set(4, 2, 3))", Value::Null;
-    case_ignored_set_add: "set(1, 2, 3).add(4)", Value::Null;
-    case_ignored_set_addition: "set(1, 2, 3) + set(4, 2, 3)", Value::Null;
-    case_ignored_set_lt: "set(1, 2, 3) < set(1, 2, 3, 4)", Value::Null;
-    case_ignored_set_lt_false: "set(1, 2, 3) < set(1, 2, 5)", Value::Null;
-    case_ignored_set_gt: "set(1, 2, 3, 4) > set(1, 2, 3)", Value::Null;
-    case_ignored_set_gt_false: "set(1, 2, 3) > set(1, 2, 3)", Value::Null;
-    case_ignored_set_gte_false: "set(1, 2, 4) >= set(1, 2, 3)", Value::Null;
-    case_ignored_set_gte: "set(1, 2, 3) >= set(1, 2, 3)", Value::Null;
-    case_ignored_set_lte_false: "set(1, 2, 3) <= set(1, 2, 4)", Value::Null;
-    case_ignored_set_lte: "set(1, 2, 3) <= set(1, 2, 3)", Value::Null;
-    case_ignored_set_difference: "set(1, 2, 3, 4).difference(set(2, 3))", Value::Null;
-    case_ignored_set_subtraction: "set(1, 2, 3, 4) - set(2, 3)", Value::Null;
-    case_ignored_set_symmetric_diff: "set(1, 2, 3, 4).symmetricDifference(set(2, 3, 5))", Value::Null;
-    case_ignored_set_add_4: "set(1, 2, 3).add(4)", Value::Null;
-    case_ignored_set_add_4_5: "set(1, 2, 3).add(4, 5)", Value::Null;
-    case_ignored_set_add_list: "set(1, 2, 3).add([1, 2])", Value::Null;
-    case_ignored_set_add_null: "set(1, 2, 3).add(4, 5, null)", Value::Null;
-    case_ignored_set_remove_2: "set(1, 2, 3).remove(2)", Value::Null;
-    case_ignored_set_remove_multi: "set(1, 2, null, 3).remove(1, 2, 5)", Value::Null;
-    case_ignored_set_remove_null: "set(1, 2, null, 3).remove(1, 2, 5, null)", Value::Null;
-    case_ignored_set_remove_list: "set(1, 2, 3, [1, 2]).remove([1, 2])", Value::Null;
     case_ignored_dict_get_2arg: "$.get(c, 50)", json!({"a": 12, "b c": 44});
     case_ignored_dict_list_key: "dict($ => 3).get($)", json!([1, 2]);
     case_ignored_dict_list_key_nested: "dict($ => 3).get($)", json!([1, [2]]);
@@ -748,9 +753,6 @@ ignored_compliance_cases! {
     case_ignored_merge_with_func: "$.d1.mergeWith($.d2, $1 + $2)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
     case_ignored_merge_with_levels: "$.d1.mergeWith($.d2, $1 + $2, maxLevels => 1)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
     case_ignored_merge_with_min: "$.d1.mergeWith($.d2,, min($1, $2))", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
-    case_ignored_is_iterable_set: "isIterable(set(1,2))", Value::Null;
-    case_ignored_is_iterable_str: "isIterable(\"foo\")", Value::Null;
-    case_ignored_is_iterable_dict: "isIterable({\"a\" => 1})", Value::Null;
 
     // test_regex.py — regex not yet implemented
     case_ignored_regex_matches: "regex('a.b').matches(axb)", Value::Null;

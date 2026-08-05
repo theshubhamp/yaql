@@ -1,5 +1,4 @@
 use crate::lang::primitive::{Primitive, compare, primitive_eq};
-use crate::lang::operators::eq;
 use crate::lang::functions::{FromPrimitive, IntoPrimitive, Spec};
 use crate::yaql_function;
 use crate::yaql_raw_function;
@@ -55,20 +54,9 @@ pub fn contains_string(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)
 }
 yaql_raw_function!("contains", contains_string, ArgSpec::Exact(2), [Type::String, Type::String], false);
 
-pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let mut seen = Vec::new();
-    for arg in args {
-        if !seen.iter().any(|e: &Primitive| matches!(eq(e.clone(), arg.clone()), Primitive::Boolean(true))) {
-            seen.push(arg);
-        }
-    }
-    Primitive::Array(seen)
-}
-yaql_raw_function!("set", set_fn, ArgSpec::Varargs, [], false);
-
 pub fn max(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let iter: Vec<Primitive> = if args.len() == 1 {
-        match &args[0] { Primitive::Array(a) => a.clone(), other => vec![other.clone()] }
+        match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
     } else { args };
     let mut result: Option<Primitive> = None;
     for arg in iter {
@@ -84,7 +72,7 @@ yaql_raw_function!("max", max, ArgSpec::Min(1), [], false);
 
 pub fn min(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let iter: Vec<Primitive> = if args.len() == 1 {
-        match &args[0] { Primitive::Array(a) => a.clone(), other => vec![other.clone()] }
+        match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
     } else { args };
     let mut result: Option<Primitive> = None;
     for arg in iter {

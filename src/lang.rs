@@ -3,6 +3,7 @@ pub mod operators;
 pub mod branching;
 pub mod strings;
 pub mod collections;
+pub mod sets;
 pub mod query;
 pub mod math;
 pub mod functions;

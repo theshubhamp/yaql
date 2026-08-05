@@ -1,9 +1,27 @@
 use crate::lang::primitive::{Primitive, as_f64, arith, truthy, primitive_eq};
+use crate::lang::sets::{set_push_unique, is_subset, set_equal, set_difference};
 
 pub fn add(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::String(l), Primitive::String(r)) => Primitive::String(format!("{}{}", l, r)),
         (Primitive::Array(l), Primitive::Array(r)) => {
+            let mut combined = l.clone();
+            combined.extend(r.iter().cloned());
+            Primitive::Array(combined)
+        }
+        (Primitive::Set(l), Primitive::Set(r)) => {
+            let mut combined = l.clone();
+            for e in r {
+                set_push_unique(&mut combined, e);
+            }
+            Primitive::Set(combined)
+        }
+        (Primitive::Set(l), Primitive::Array(r)) => {
+            let mut combined = l.clone();
+            combined.extend(r.iter().cloned());
+            Primitive::Array(combined)
+        }
+        (Primitive::Array(l), Primitive::Set(r)) => {
             let mut combined = l.clone();
             combined.extend(r.iter().cloned());
             Primitive::Array(combined)
@@ -20,7 +38,10 @@ pub fn add(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn sub(left: Primitive, right: Primitive) -> Primitive {
-    arith(&left, &right, |a, b| a - b, |a, b| a - b)
+    match (&left, &right) {
+        (Primitive::Set(l), Primitive::Set(r)) => Primitive::Set(set_difference(l, r)),
+        _ => arith(&left, &right, |a, b| a - b, |a, b| a - b),
+    }
 }
 
 pub fn mul(left: Primitive, right: Primitive) -> Primitive {
@@ -56,9 +77,14 @@ pub fn eq(left: Primitive, right: Primitive) -> Primitive {
         (Primitive::Float(l), Primitive::Float(r)) => l == r,
         (Primitive::Int(l), Primitive::Float(r)) => *l as f64 == *r,
         (Primitive::Float(l), Primitive::Int(r)) => *l == *r as f64,
+        (Primitive::Int(l), Primitive::Boolean(r)) => (*l == 1) == *r,
+        (Primitive::Boolean(l), Primitive::Int(r)) => *l == (*r == 1),
+        (Primitive::Float(l), Primitive::Boolean(r)) => (*l == 1.0) == *r,
+        (Primitive::Boolean(l), Primitive::Float(r)) => *l == (*r == 1.0),
         (Primitive::Boolean(l), Primitive::Boolean(r)) => l == r,
         (Primitive::Null, Primitive::Null) => true,
         (Primitive::Array(l), Primitive::Array(r)) => l.len() == r.len() && l.iter().zip(r).all(|(a, b)| primitive_eq(a, b)),
+        (Primitive::Set(l), Primitive::Set(r)) => set_equal(l, r),
         (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| primitive_eq(v, rv))),
         _ => false
     };
@@ -72,6 +98,9 @@ pub fn neq(left: Primitive, right: Primitive) -> Primitive {
 
 pub fn lt(left: Primitive, right: Primitive) -> Primitive {
     let result = match (&left, &right) {
+        (Primitive::Set(l), Primitive::Set(r)) => {
+            l.len() < r.len() && is_subset(l, r)
+        }
         (Primitive::Null, Primitive::Null) => false,
         (Primitive::Null, _) => true,
         (_, Primitive::Null) => false,
@@ -84,13 +113,24 @@ pub fn lt(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn lteq(left: Primitive, right: Primitive) -> Primitive {
-    let Primitive::Boolean(lt_result) = lt(left.clone(), right.clone()) else { return Primitive::Boolean(false) };
-    let Primitive::Boolean(eq_result) = eq(left, right) else { return Primitive::Boolean(false) };
-    Primitive::Boolean(lt_result || eq_result)
+    let result = match (&left, &right) {
+        (Primitive::Set(l), Primitive::Set(r)) => is_subset(l, r),
+        (Primitive::Null, Primitive::Null) => true,
+        (Primitive::Null, _) => true,
+        (_, Primitive::Null) => false,
+        _ => match (as_f64(&left), as_f64(&right)) {
+            (Some(l), Some(r)) => l <= r,
+            _ => false,
+        },
+    };
+    Primitive::Boolean(result)
 }
 
 pub fn gt(left: Primitive, right: Primitive) -> Primitive {
     let result = match (&left, &right) {
+        (Primitive::Set(l), Primitive::Set(r)) => {
+            l.len() > r.len() && is_subset(r, l)
+        }
         (Primitive::Null, Primitive::Null) => false,
         (Primitive::Null, _) => false,
         (_, Primitive::Null) => true,
@@ -103,15 +143,24 @@ pub fn gt(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn gteq(left: Primitive, right: Primitive) -> Primitive {
-    let Primitive::Boolean(gt_result) = gt(left.clone(), right.clone()) else { return Primitive::Boolean(false) };
-    let Primitive::Boolean(eq_result) = eq(left, right) else { return Primitive::Boolean(false) };
-    Primitive::Boolean(gt_result || eq_result)
+    let result = match (&left, &right) {
+        (Primitive::Set(l), Primitive::Set(r)) => is_subset(r, l),
+        (Primitive::Null, Primitive::Null) => true,
+        (Primitive::Null, _) => false,
+        (_, Primitive::Null) => true,
+        _ => match (as_f64(&left), as_f64(&right)) {
+            (Some(l), Some(r)) => l >= r,
+            _ => false,
+        },
+    };
+    Primitive::Boolean(result)
 }
 
 pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
     let result = match (&left, &right) {
         (Primitive::String(needle), Primitive::String(haystack)) => haystack.contains(needle.as_str()),
-        (_, Primitive::Array(arr, ..)) => arr.iter().any(|e| matches!(eq(e.clone(), left.clone()), Primitive::Boolean(true))),
+        (_, Primitive::Array(arr, ..)) => arr.iter().any(|e| primitive_eq(e, &left)),
+        (_, Primitive::Set(arr)) => arr.iter().any(|e| primitive_eq(e, &left)),
         _ => false,
     };
     Primitive::Boolean(result)

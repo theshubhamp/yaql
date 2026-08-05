@@ -1,4 +1,5 @@
 use crate::lang::Primitive;
+use crate::lang::primitive::{compare, type_rank};
 
 pub fn json_to_primitive(value: &serde_json::Value) -> Primitive {
     match value {
@@ -39,6 +40,16 @@ pub fn primitive_to_json(value: &Primitive) -> serde_json::Value {
         Primitive::String(s) => serde_json::Value::String(s.clone()),
         Primitive::Array(arr) => {
             serde_json::Value::Array(arr.iter().map(primitive_to_json).collect())
+        }
+        Primitive::Set(arr) => {
+            let mut sorted: Vec<&Primitive> = arr.iter().collect();
+            sorted.sort_by(|a, b| {
+                match type_rank(a).cmp(&type_rank(b)) {
+                    std::cmp::Ordering::Equal => compare(a, b),
+                    ord => ord,
+                }
+            });
+            serde_json::Value::Array(sorted.iter().map(|p| primitive_to_json(p)).collect())
         }
         Primitive::Map(map) => {
             let mut obj = serde_json::Map::new();

@@ -4,6 +4,7 @@ use crate::yaql_function;
 
 yaql_function!("len", len_string(s: String) -> i64 { s.chars().count() as i64 });
 yaql_function!("len", len_array(a: Vec<Primitive>) -> i64 { a.len() as i64 });
+yaql_function!("len", len_set(a: SetVec) -> i64 { a.0.len() as i64 });
 yaql_function!("len", len_map(m: std::collections::HashMap<String, Primitive>) -> i64 { m.len() as i64 });
 
 yaql_function!("str", str_from_string(s: String) -> String { s });

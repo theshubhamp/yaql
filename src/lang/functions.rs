@@ -11,6 +11,7 @@ pub enum Type {
     String,
     Boolean,
     Array,
+    Set,
     Map,
     Null,
     Any,
@@ -25,6 +26,7 @@ impl Type {
             (Type::String, Primitive::String(_)) => true,
             (Type::Boolean, Primitive::Boolean(_)) => true,
             (Type::Array, Primitive::Array(_)) => true,
+            (Type::Set, Primitive::Set(_)) => true,
             (Type::Map, Primitive::Map(_)) => true,
             (Type::Null, Primitive::Null) => true,
             (Type::Any, _) => true,
@@ -99,6 +101,13 @@ impl FromPrimitive for Vec<Primitive> {
     }
 }
 
+impl FromPrimitive for SetVec {
+    const TYPE: Type = Type::Set;
+    fn from_primitive(p: &Primitive) -> Option<Self> {
+        if let Primitive::Set(a) = p { Some(SetVec(a.clone())) } else { None }
+    }
+}
+
 impl FromPrimitive for std::collections::HashMap<String, Primitive> {
     const TYPE: Type = Type::Map;
     fn from_primitive(p: &Primitive) -> Option<Self> {
@@ -125,6 +134,8 @@ impl FromPrimitive for Number {
         }
     }
 }
+
+pub struct SetVec(pub Vec<Primitive>);
 
 pub struct Any(pub Primitive);
 impl FromPrimitive for Any {
@@ -168,6 +179,10 @@ impl IntoPrimitive for bool {
 
 impl IntoPrimitive for Vec<Primitive> {
     fn into_primitive(self) -> Primitive { Primitive::Array(self) }
+}
+
+impl IntoPrimitive for SetVec {
+    fn into_primitive(self) -> Primitive { Primitive::Set(self.0) }
 }
 
 impl<T: IntoPrimitive> IntoPrimitive for Option<T> {

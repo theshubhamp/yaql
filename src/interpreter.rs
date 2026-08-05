@@ -140,6 +140,11 @@ impl Visitor<Option<Primitive>> for Interpreter {
                 let pos = if *i < 0 { *i + len } else { *i };
                 arr.get(pos as usize).cloned()
             }
+            (Primitive::Set(arr), Primitive::Int(i)) => {
+                let len = arr.len() as i64;
+                let pos = if *i < 0 { *i + len } else { *i };
+                arr.get(pos as usize).cloned()
+            }
             (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned(),
             _ => None,
         }
