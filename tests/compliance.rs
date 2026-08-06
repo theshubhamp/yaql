@@ -621,6 +621,27 @@ compliance_cases! {
     case_list_last_index_of: "[1, 2, 3, 2, 1].lastIndexOf(2)", Value::Null;
     case_list_last_index_of_22: "[1, 2, 3, 2, 1].lastIndexOf(22)", Value::Null;
     case_split_at: "range(1, 6).splitAt(2)", Value::Null;
+
+    // ========================================================================= //
+    // Math fixes
+    // ========================================================================= //
+    case_pow_3arg: "pow(2, 5, 7)", Value::Null;
+    case_round_2arg: "round(2.345, 1)", Value::Null;
+    case_bitwise_not: "bitwiseNot(1)", Value::Null;
+    case_div_zero: "7 / 0", Value::Null;
+    case_div_zero_float: "7 / -0.0", Value::Null;
+    case_div_zero_0_0: "0/0", Value::Null;
+    case_mod_int_neg: "9 mod -5", Value::Null;
+    case_mod_float_neg: "9.1 mod -5.1", Value::Null;
+
+    // ========================================================================= //
+    // switchCase
+    // ========================================================================= //
+    case_switch_case_0: "$.switchCase('a', 'b', 'c')", json!(0);
+    case_switch_case_1: "$.switchCase('a', 'b', 'c')", json!(1);
+    case_switch_case_3: "$.switchCase('a', 'b', 'c')", json!(3);
+    case_switch_case_30: "$.switchCase('a', 'b', 'c')", json!(30);
+    case_switch_case_neg30: "$.switchCase('a', 'b', 'c')", json!(-30);
 }
 
 ignored_compliance_cases! {
@@ -633,8 +654,6 @@ ignored_compliance_cases! {
     case_ignored_div_float_neg: "-5.0 / 2.0", Value::Null;
     case_ignored_mul_float_neg: "3.1 * -2.1", Value::Null;
     case_ignored_mul_float_neg_neg: "-3.1 * -2.1", Value::Null;
-    case_ignored_mod_int_neg: "9 mod -5", Value::Null;
-    case_ignored_mod_float_neg: "9.1 mod -5.1", Value::Null;
     case_ignored_unary_double_minus: "3--1", Value::Null;
     case_ignored_unary_minus_plus: "3+-1", Value::Null;
     case_ignored_unary_float: "3.2 - -1.1", Value::Null;
@@ -644,22 +663,9 @@ ignored_compliance_cases! {
     case_ignored_unary_plus_plus: "3++1", Value::Null;
     case_ignored_unary_plus_float: "3.2 - +1.1", Value::Null;
 
-    // test_branching.py — switchCase not yet implemented
-    case_ignored_switch_case_0: "$.switchCase('a', 'b', 'c')", json!(0);
-    case_ignored_switch_case_1: "$.switchCase('a', 'b', 'c')", json!(1);
-    case_ignored_switch_case_3: "$.switchCase('a', 'b', 'c')", json!(3);
-    case_ignored_switch_case_30: "$.switchCase('a', 'b', 'c')", json!(30);
-    case_ignored_switch_case_neg30: "$.switchCase('a', 'b', 'c')", json!(-30);
-
-    // test_math.py — 3-arg pow, 2-arg round, zero division, random, bitwiseNot
-    case_ignored_pow_3arg: "pow(2, 5, 7)", Value::Null;
-    case_ignored_round_2arg: "round(2.345, 1)", Value::Null;
-    case_ignored_div_zero: "7 / 0", Value::Null;
-    case_ignored_div_zero_float: "7 / -0.0", Value::Null;
-    case_ignored_div_zero_0_0: "0/0", Value::Null;
+    // test_math.py — random needs let/with
     case_ignored_random: "with(random()) -> $ >= 0 and $ < 1", Value::Null;
     case_ignored_random_range: "with(random(2, 5)) -> $ >= 2 and $ <= 5", Value::Null;
-    case_ignored_bitwise_not: "bitwiseNot(1)", Value::Null;
 
     // test_strings.py — split, join, norm, replace, trim, substring, indexOf, characters
     case_ignored_join_seq: "[text, 1, null, true].select(str($)).join('-')", Value::Null;

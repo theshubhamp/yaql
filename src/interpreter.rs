@@ -67,9 +67,15 @@ impl Visitor<Option<Primitive>> for Interpreter {
     }
 
     fn visit_binary_operator(&self, left: Value, op: String, right: Value) -> Option<Primitive> {
-        let left_value = self.visit(left)?;
-        let right_value = self.visit(right)?;
-        Some(BINARY_OPERATORS.lookup(op)(left_value, right_value))
+        match op.as_str() {
+            "and" => self.visit_and(left, right),
+            "or" => self.visit_or(left, right),
+            _ => {
+                let left_value = self.visit(left)?;
+                let right_value = self.visit(right)?;
+                Some(BINARY_OPERATORS.lookup(op)(left_value, right_value))
+            }
+        }
     }
 
     fn visit_method_call(&self, receiver: Value, optional: bool, method: String, args: Vec<Value>, kwargs: Vec<(Value, Value)>) -> Option<Primitive> {
@@ -170,6 +176,20 @@ impl Visitor<Option<Primitive>> for Interpreter {
             (Primitive::Map(map), Primitive::Int(i)) => map.get(&i.to_string()).cloned().or(default),
             _ => default,
         }
+    }
+}
+
+impl Interpreter {
+    fn visit_and(&self, left: Value, right: Value) -> Option<Primitive> {
+        let left_value = self.visit(left)?;
+        if !truthy(&left_value) { return Some(left_value); }
+        self.visit(right)
+    }
+
+    fn visit_or(&self, left: Value, right: Value) -> Option<Primitive> {
+        let left_value = self.visit(left)?;
+        if truthy(&left_value) { return Some(left_value); }
+        self.visit(right)
     }
 }
 

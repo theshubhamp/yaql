@@ -289,9 +289,14 @@ impl<'input> Lexer<'input> {
                 self.chars.next();
                 self.pos += c.len_utf8();
             } else if c == '.' && !has_dot {
-                has_dot = true;
-                self.chars.next();
-                self.pos += 1;
+                let next = self.peek_byte_after(1);
+                if next.map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    has_dot = true;
+                    self.chars.next();
+                    self.pos += 1;
+                } else {
+                    break;
+                }
             } else {
                 break;
             }

@@ -60,3 +60,12 @@ pub fn concat(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Pri
     Primitive::String(result)
 }
 yaql_raw_function!("concat", concat, ArgSpec::Varargs, [], false);
+
+pub fn switch_case_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Int(index) = &args[0] else { return Primitive::Null };
+    let cases = &args[1..];
+    if cases.is_empty() { return Primitive::Null; }
+    let idx = (*index as usize).min(cases.len() - 1);
+    cases[idx].clone()
+}
+yaql_raw_function!("switchCase", switch_case_fn, ArgSpec::Min(1), [Type::Int], false);

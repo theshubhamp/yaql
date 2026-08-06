@@ -59,11 +59,23 @@ pub fn mul(left: Primitive, right: Primitive) -> Primitive {
 }
 
 pub fn div(left: Primitive, right: Primitive) -> Primitive {
-    arith(&left, &right, |a, b| a / b, |a, b| (a as f64 / b as f64).floor() as i64)
+    match (&left, &right) {
+        (Primitive::Int(_), Primitive::Int(0)) => panic!("division by zero"),
+        (Primitive::Int(_), Primitive::Float(0.0)) => panic!("division by zero"),
+        (Primitive::Float(_), Primitive::Int(0)) => panic!("division by zero"),
+        (Primitive::Float(_), Primitive::Float(0.0)) => panic!("division by zero"),
+        _ => arith(&left, &right, |a, b| a / b, |a, b| (a as f64 / b as f64).floor() as i64),
+    }
 }
 
 pub fn modulo(left: Primitive, right: Primitive) -> Primitive {
-    arith(&left, &right, |a, b| a % b, |a, b| a - b * (a as f64 / b as f64).floor() as i64)
+    match (&left, &right) {
+        (Primitive::Int(l), Primitive::Int(r)) => Primitive::Int(*l - r * ((*l as f64 / *r as f64).floor() as i64)),
+        _ => match (as_f64(&left), as_f64(&right)) {
+            (Some(l), Some(r)) => Primitive::Float(l - r * (l / r).floor()),
+            _ => Primitive::Null,
+        },
+    }
 }
 
 pub fn and(left: Primitive, right: Primitive) -> Primitive {
