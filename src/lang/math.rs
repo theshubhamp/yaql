@@ -1,7 +1,7 @@
-use crate::lang::primitive::{Primitive, as_f64};
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Number, Any, Null, ArgSpec, Type, Spec};
+use crate::lang::primitive::Primitive;
 use crate::yaql_function;
 use crate::yaql_raw_function;
+use crate::lang::functions::ArgSpec;
 
 // --- Typed function definitions + registration ---
 
@@ -11,24 +11,14 @@ yaql_function!("sign", sign_int(n: i64) -> i64 { n.signum() });
 yaql_function!("sign", sign_float(n: f64) -> i64 { if n > 0.0 { 1 } else if n < 0.0 { -1 } else { 0 } });
 yaql_function!("pow", pow_int(base: i64, exp: i64) -> i64 { base.pow(exp as u32) });
 
-pub fn pow_float(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let b = as_f64(&args[0]);
-    let e = as_f64(&args[1]);
-    match (b, e) {
-        (Some(b), Some(e)) => Primitive::Float(b.powf(e)),
-        _ => Primitive::Null,
-    }
-}
-yaql_raw_function!("pow", pow_float, ArgSpec::Exact(2), [Type::Number, Type::Number], false);
+yaql_function!("pow", pow_float(base: Number, exp: Number) -> f64 {
+    base.0.powf(exp.0)
+});
 
-pub fn pow_mod(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let base = match &args[0] { Primitive::Int(n) => *n, _ => return Primitive::Null };
-    let exp = match &args[1] { Primitive::Int(n) => *n, _ => return Primitive::Null };
-    let modulus = match &args[2] { Primitive::Int(n) => *n, _ => return Primitive::Null };
-    if modulus == 0 { return Primitive::Null; }
-    Primitive::Int(base.rem_euclid(modulus).pow(exp as u32).rem_euclid(modulus))
-}
-yaql_raw_function!("pow", pow_mod, ArgSpec::Exact(3), [Type::Int, Type::Int, Type::Int], false);
+yaql_function!("pow", pow_mod(base: i64, exp: i64, modulus: i64) -> Option<i64> {
+    if modulus == 0 { None }
+    else { Some(base.rem_euclid(modulus).pow(exp as u32).rem_euclid(modulus)) }
+});
 
 yaql_function!("round", round_1(n: Number) -> f64 {
     let n = n.0;
@@ -39,9 +29,8 @@ yaql_function!("round", round_1(n: Number) -> f64 {
     else { i as f64 }
 });
 
-pub fn round_2(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let n = match as_f64(&args[0]) { Some(n) => n, None => return Primitive::Null };
-    let decimals = match &args[1] { Primitive::Int(d) => *d, _ => return Primitive::Null };
+yaql_function!("round", round_2(n: Number, decimals: i64) -> f64 {
+    let n = n.0;
     let factor = 10f64.powi(decimals as i32);
     let scaled = n * factor;
     let i = scaled as i64;
@@ -49,9 +38,8 @@ pub fn round_2(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Pr
     let rounded = if diff > 0.5 || diff < -0.5 { scaled.round() }
         else if diff == 0.5 || diff == -0.5 { if i % 2 == 0 { i as f64 } else { (i + 1) as f64 } }
         else { i as f64 };
-    Primitive::Float(rounded / factor)
-}
-yaql_raw_function!("round", round_2, ArgSpec::Exact(2), [Type::Number, Type::Int], false);
+    rounded / factor
+});
 
 yaql_function!("int", int_from_int(n: i64) -> i64 { n });
 yaql_function!("int", int_from_float(n: f64) -> i64 { n as i64 });

@@ -197,6 +197,10 @@ impl IntoPrimitive for Vec<Primitive> {
     fn into_primitive(self) -> Primitive { Primitive::Array(self) }
 }
 
+impl IntoPrimitive for std::collections::HashMap<String, Primitive> {
+    fn into_primitive(self) -> Primitive { Primitive::Map(self) }
+}
+
 impl IntoPrimitive for SetVec {
     fn into_primitive(self) -> Primitive { Primitive::Set(self.0) }
 }
@@ -272,6 +276,29 @@ macro_rules! yaql_function {
                     Some(v) => v, None => return Primitive::Null,
                 };
                 let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
+                    Some(v) => v, None => return Primitive::Null,
+                };
+                let __ret: $ret = $body;
+                IntoPrimitive::into_primitive(__ret)
+            }
+        }
+        inventory::submit! { $name::SPEC }
+    };
+    ($yaql_name:literal, $name:ident($p0:ident : $t0:ty, $p1:ident : $t1:ty, $p2:ident : $t2:ty, $p3:ident : $t3:ty) -> $ret:ty $body:block) => {
+        mod $name {
+            use crate::lang::functions::*;
+            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(4), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE, <$t2 as FromPrimitive>::TYPE, <$t3 as FromPrimitive>::TYPE], false);
+            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+                let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
+                    Some(v) => v, None => return Primitive::Null,
+                };
+                let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
+                    Some(v) => v, None => return Primitive::Null,
+                };
+                let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
+                    Some(v) => v, None => return Primitive::Null,
+                };
+                let $p3 = match <$t3 as FromPrimitive>::from_primitive(&args[3]) {
                     Some(v) => v, None => return Primitive::Null,
                 };
                 let __ret: $ret = $body;

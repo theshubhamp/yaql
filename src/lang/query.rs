@@ -1,5 +1,4 @@
 use crate::lang::primitive::{Primitive, LambdaBody};
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Spec, SetVec};
 use crate::yaql_function;
 use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
@@ -134,74 +133,53 @@ pub fn sum(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primit
 yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Array], false);
 yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Set], false);
 
-pub fn split_at_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let pos = match &args[1] {
-        Primitive::Int(n) => {
-            let len = arr.len() as i64;
-            if *n < 0 { ((len + n).max(0)) as usize } else { (*n as usize).min(arr.len()) }
-        }
-        _ => return Primitive::Null,
-    };
-    Primitive::Array(vec![
+yaql_function!("splitAt", split_at_fn(arr: Vec<Primitive>, pos: i64) -> Vec<Primitive> {
+    let len = arr.len() as i64;
+    let pos = if pos < 0 { ((len + pos).max(0)) as usize } else { (pos as usize).min(arr.len()) };
+    vec![
         Primitive::Array(arr[..pos].to_vec()),
         Primitive::Array(arr[pos..].to_vec()),
-    ])
-}
-yaql_raw_function!("splitAt", split_at_fn, ArgSpec::Exact(2), [Type::Array, Type::Int], false);
+    ]
+});
 
 // --- enumerate ---
-pub fn enumerate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let start = if args.len() > 1 {
-        if let Primitive::Int(n) = &args[1] { *n } else { 0 }
-    } else { 0 };
-    let result: Vec<Primitive> = arr.iter().enumerate().map(|(i, v)| {
+yaql_function!("enumerate", enumerate_1(arr: Vec<Primitive>) -> Vec<Primitive> {
+    arr.iter().enumerate().map(|(i, v)| {
+        Primitive::Array(vec![Primitive::Int(i as i64), v.clone()])
+    }).collect()
+});
+
+yaql_function!("enumerate", enumerate_2(arr: Vec<Primitive>, start: i64) -> Vec<Primitive> {
+    arr.iter().enumerate().map(|(i, v)| {
         Primitive::Array(vec![Primitive::Int(start + i as i64), v.clone()])
-    }).collect();
-    Primitive::Array(result)
-}
-yaql_raw_function!("enumerate", enumerate_fn, ArgSpec::Min(1), [Type::Array], false);
+    }).collect()
+});
 
 // --- single ---
-pub fn single_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
+yaql_function!("single", single_fn(arr: Vec<Primitive>) -> Primitive {
     if arr.len() == 1 { arr[0].clone() } else { Primitive::Null }
-}
-yaql_raw_function!("single", single_fn, ArgSpec::Exact(1), [Type::Array], false);
+});
 
 // --- slice (chunk into sublists of given size) ---
-pub fn slice_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Primitive::Int(size) = &args[1] else { return Primitive::Null };
-    let size = (*size as usize).max(1);
-    let result: Vec<Primitive> = arr.chunks(size).map(|chunk| Primitive::Array(chunk.to_vec())).collect();
-    Primitive::Array(result)
-}
-yaql_raw_function!("slice", slice_fn, ArgSpec::Exact(2), [Type::Array, Type::Int], false);
+yaql_function!("slice", slice_fn(arr: Vec<Primitive>, size: i64) -> Vec<Primitive> {
+    let size = (size as usize).max(1);
+    arr.chunks(size).map(|chunk| Primitive::Array(chunk.to_vec())).collect()
+});
 
 // --- any (no predicate: non-empty) ---
-pub fn any_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    Primitive::Boolean(!arr.is_empty())
-}
-yaql_raw_function!("any", any_fn, ArgSpec::Exact(1), [Type::Array], false);
+yaql_function!("any", any_fn(arr: Vec<Primitive>) -> bool {
+    !arr.is_empty()
+});
 
 // --- all (no predicate: all truthy) ---
-pub fn all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    Primitive::Boolean(arr.iter().all(crate::lang::truthy))
-}
-yaql_raw_function!("all", all_fn, ArgSpec::Exact(1), [Type::Array], false);
+yaql_function!("all", all_fn(arr: Vec<Primitive>) -> bool {
+    arr.iter().all(crate::lang::truthy)
+});
 
 // --- defaultIfEmpty ---
-pub fn default_if_empty_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    match &args[0] {
-        Primitive::Array(arr) if arr.is_empty() => args[1].clone(),
-        other => other.clone(),
-    }
-}
-yaql_raw_function!("defaultIfEmpty", default_if_empty_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("defaultIfEmpty", default_if_empty_fn(arr: Vec<Primitive>, default: Any) -> Primitive {
+    if arr.is_empty() { default.0 } else { Primitive::Array(arr) }
+});
 
 // --- Lambda-consuming functions ---
 
@@ -811,10 +789,7 @@ yaql_raw_function!("repeat", repeat_fn, ArgSpec::Min(1), [Type::Any], false);
 
 // --- cycle ---
 // cycle(array) -> infinite cycling of array elements (capped at 10000)
-pub fn cycle_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    if arr.is_empty() { return Primitive::Array(Vec::new()); }
-    let result: Vec<Primitive> = (0..10000).map(|i| arr[i % arr.len()].clone()).collect();
-    Primitive::Array(result)
-}
-yaql_raw_function!("cycle", cycle_fn, ArgSpec::Exact(1), [Type::Array], false);
+yaql_function!("cycle", cycle_fn(arr: Vec<Primitive>) -> Vec<Primitive> {
+    if arr.is_empty() { Vec::new() }
+    else { (0..10000).map(|i| arr[i % arr.len()].clone()).collect() }
+});

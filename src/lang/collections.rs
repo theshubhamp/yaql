@@ -1,5 +1,4 @@
-use crate::lang::primitive::{Primitive, compare, primitive_eq};
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Spec};
+use crate::lang::primitive::{Primitive, compare};
 use crate::yaql_function;
 use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
@@ -130,36 +129,28 @@ pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 }
 yaql_raw_function!("delete", dict_delete_fn, ArgSpec::Min(2), [Type::Map], false);
 
-pub fn dict_delete_all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Map(mut m) = args[0].clone() else { return Primitive::Null };
-    if let Primitive::Array(keys) = &args[1] {
-        for k in keys {
-            let key = match k {
-                Primitive::String(s) => s.clone(),
-                Primitive::Int(n) => n.to_string(),
-                Primitive::Boolean(b) => b.to_string(),
-                Primitive::Null => "null".to_string(),
-                _ => continue,
-            };
-            m.remove(&key);
-        }
+yaql_function!("deleteAll", dict_delete_all_fn(m: HashMap<String, Primitive>, keys: Vec<Primitive>) -> HashMap<String, Primitive> {
+    let mut m = m;
+    for k in &keys {
+        let key = match k {
+            Primitive::String(s) => s.clone(),
+            Primitive::Int(n) => n.to_string(),
+            Primitive::Boolean(b) => b.to_string(),
+            Primitive::Null => "null".to_string(),
+            _ => continue,
+        };
+        m.remove(&key);
     }
-    Primitive::Map(m)
-}
-yaql_raw_function!("deleteAll", dict_delete_all_fn, ArgSpec::Exact(2), [Type::Map, Type::Array], false);
+    m
+});
 
-pub fn contains_array(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Boolean(false) };
-    Primitive::Boolean(arr.iter().any(|e| primitive_eq(e, &args[1])))
-}
-yaql_raw_function!("contains", contains_array, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("contains", contains_array(arr: Vec<Primitive>, item: Any) -> bool {
+    arr.iter().any(|e| crate::lang::primitive::primitive_eq(e, &item.0))
+});
 
-pub fn contains_string(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Boolean(false) };
-    let Primitive::String(sub) = &args[1] else { return Primitive::Boolean(false) };
-    Primitive::Boolean(s.contains(sub.as_str()))
-}
-yaql_raw_function!("contains", contains_string, ArgSpec::Exact(2), [Type::String, Type::String], false);
+yaql_function!("contains", contains_string(s: String, sub: String) -> bool {
+    s.contains(sub.as_str())
+});
 
 pub fn max(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let iter: Vec<Primitive> = if args.len() == 1 {
@@ -205,96 +196,87 @@ yaql_raw_function!("min", min, ArgSpec::Min(1), [], false);
 
 // --- List mutation ---
 
-fn norm_idx(i: i64, len: usize) -> usize {
+pub(crate) fn norm_idx(i: i64, len: usize) -> usize {
     if i < 0 { ((len as i64) + i).max(0) as usize } else { (i as usize).min(len) }
 }
 
-pub fn list_delete(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let start = match &args[1] { Primitive::Int(n) => norm_idx(*n, arr.len()), _ => return Primitive::Null };
-    let count = if args.len() > 2 {
-        match &args[2] {
-            Primitive::Int(n) if *n < 0 => arr.len() - start,
-            Primitive::Int(n) => *n as usize,
-            _ => 1,
-        }
-    } else { 1 };
-    let mut result = arr.clone();
+yaql_function!("delete", list_delete_2(arr: Vec<Primitive>, index: i64) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let mut result = arr;
+    let end = (start + 1).min(result.len());
+    result.drain(start..end);
+    result
+});
+
+yaql_function!("delete", list_delete_3(arr: Vec<Primitive>, index: i64, count: i64) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let count = if count < 0 { arr.len() - start } else { count as usize };
+    let mut result = arr;
     let end = (start + count).min(result.len());
     result.drain(start..end);
-    Primitive::Array(result)
-}
-yaql_raw_function!("delete", list_delete, ArgSpec::Min(2), [Type::Array, Type::Int], false);
+    result
+});
 
-pub fn list_insert(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let mut pos = match &args[1] { Primitive::Int(n) => norm_idx(*n, arr.len()), _ => return Primitive::Null };
+yaql_function!("insert", list_insert(arr: Vec<Primitive>, pos: i64, value: Any) -> Vec<Primitive> {
+    let mut pos = crate::lang::collections::norm_idx(pos, arr.len());
     pos = pos.min(arr.len());
-    let mut result = arr.clone();
-    result.insert(pos, args[2].clone());
-    Primitive::Array(result)
-}
-yaql_raw_function!("insert", list_insert, ArgSpec::Exact(3), [Type::Array, Type::Int, Type::Any], false);
+    let mut result = arr;
+    result.insert(pos, value.0);
+    result
+});
 
-pub fn list_insert_many(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let pos = match &args[1] {
-        Primitive::Int(n) if *n < 0 => 0,
-        Primitive::Int(n) => (*n as usize).min(arr.len()),
-        _ => return Primitive::Null,
-    };
-    let Primitive::Array(items) = &args[2] else { return Primitive::Null };
-    let mut result = arr.clone();
+yaql_function!("insertMany", list_insert_many(arr: Vec<Primitive>, pos: i64, items: Vec<Primitive>) -> Vec<Primitive> {
+    let pos = if pos < 0 { 0 } else { (pos as usize).min(arr.len()) };
+    let mut result = arr;
     for (i, item) in items.iter().enumerate() {
         result.insert(pos + i, item.clone());
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("insertMany", list_insert_many, ArgSpec::Exact(3), [Type::Array, Type::Int, Type::Array], false);
+    result
+});
 
-pub fn list_replace(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let start = match &args[1] { Primitive::Int(n) => norm_idx(*n, arr.len()), _ => return Primitive::Null };
-    let value = args[2].clone();
-    let count = if args.len() > 3 {
-        match &args[3] {
-            Primitive::Int(n) if *n < 0 => arr.len() - start,
-            Primitive::Int(n) => *n as usize,
-            _ => 1,
-        }
-    } else { 1 };
-    let mut result = arr.clone();
+yaql_function!("replace", list_replace_3(arr: Vec<Primitive>, index: i64, value: Any) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let mut result = arr;
+    if start < result.len() { result[start] = value.0; }
+    result
+});
+
+yaql_function!("replace", list_replace_4(arr: Vec<Primitive>, index: i64, value: Any, count: i64) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let count = if count < 0 { arr.len() - start } else { count as usize };
+    let mut result = arr;
     let end = (start + count).min(result.len());
     if count == 1 {
-        if start < result.len() { result[start] = value; }
+        if start < result.len() { result[start] = value.0; }
     } else {
         result.drain(start..end);
-        result.insert(start, value);
+        result.insert(start, value.0);
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("replace", list_replace, ArgSpec::Min(3), [Type::Array, Type::Int, Type::Any], false);
+    result
+});
 
-pub fn list_replace_many(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let start = match &args[1] { Primitive::Int(n) => norm_idx(*n, arr.len()), _ => return Primitive::Null };
-    let Primitive::Array(items) = &args[2] else { return Primitive::Null };
-    let count = if args.len() > 3 {
-        match &args[3] {
-            Primitive::Int(n) if *n < 0 => arr.len() - start,
-            Primitive::Int(n) => *n as usize,
-            _ => 1,
-        }
-    } else { 1 };
-    let mut result = arr.clone();
+yaql_function!("replaceMany", list_replace_many_3(arr: Vec<Primitive>, index: i64, items: Vec<Primitive>) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let mut result = arr;
+    let end = (start + 1).min(result.len());
+    result.drain(start..end);
+    for (i, item) in items.iter().enumerate() {
+        result.insert(start + i, item.clone());
+    }
+    result
+});
+
+yaql_function!("replaceMany", list_replace_many_4(arr: Vec<Primitive>, index: i64, items: Vec<Primitive>, count: i64) -> Vec<Primitive> {
+    let start = crate::lang::collections::norm_idx(index, arr.len());
+    let count = if count < 0 { arr.len() - start } else { count as usize };
+    let mut result = arr;
     let end = (start + count).min(result.len());
     result.drain(start..end);
     for (i, item) in items.iter().enumerate() {
         result.insert(start + i, item.clone());
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("replaceMany", list_replace_many, ArgSpec::Min(3), [Type::Array, Type::Int, Type::Array], false);
+    result
+});
 
 yaql_function!("indexOf", list_index_of(arr: Vec<Primitive>, item: Any) -> i64 {
     arr.iter().position(|e| crate::lang::primitive::primitive_eq(e, &item.0)).map(|p| p as i64).unwrap_or(-1)

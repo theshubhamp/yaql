@@ -1,5 +1,5 @@
 use crate::lang::primitive::Primitive;
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Spec, ArgSpec, Type, RegexWrapper};
+use crate::lang::functions::{ArgSpec, Type, RegexWrapper};
 use crate::yaql_function;
 use crate::yaql_raw_function;
 use regex::{Regex, RegexBuilder};
@@ -149,15 +149,13 @@ pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 yaql_raw_function!("split", regex_split_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
 
 // string.split(regex) -> array
-pub fn str_split_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
+yaql_function!("split", str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<Primitive> {
     if re.0.captures_len() > 1 {
-        return Primitive::Array(split_captures(&re.0, s));
+        crate::lang::regex::split_captures(&re.0, &s)
+    } else {
+        re.0.split(&s).map(|p| Primitive::String(p.to_string())).collect()
     }
-    Primitive::Array(re.0.split(&s).map(|p| Primitive::String(p.to_string())).collect())
-}
-yaql_raw_function!("split", str_split_regex_fn, ArgSpec::Exact(2), [Type::String, Type::Regex], false);
+});
 
 // --- replace ---
 // regex.replace(string, replacement) -> string
@@ -381,7 +379,7 @@ fn split_with_max(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
     result
 }
 
-fn split_captures(re: &Regex, s: &str) -> Vec<Primitive> {
+pub(crate) fn split_captures(re: &Regex, s: &str) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut last_end = 0;
     for cap in re.captures_iter(&s) {

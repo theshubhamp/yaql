@@ -1,5 +1,4 @@
 use crate::lang::primitive::Primitive;
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Null, Spec, SetVec};
 use crate::yaql_function;
 use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
@@ -34,36 +33,39 @@ yaql_function!("toCharArray", to_char_array(s: String) -> Vec<Primitive> {
 
 // --- split ---
 
-pub fn split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    if args.len() == 1 {
-        return Primitive::Array(s.split_whitespace().map(|p| Primitive::String(p.to_string())).collect());
-    }
-    let Primitive::String(sep) = &args[1] else { return Primitive::Null };
-    if sep.is_empty() {
-        return Primitive::Array(s.chars().map(|c| Primitive::String(c.to_string())).collect());
-    }
-    Primitive::Array(s.split(sep.as_str()).map(|p| Primitive::String(p.to_string())).collect())
-}
-yaql_raw_function!("split", split_fn, ArgSpec::Min(1), [Type::String], false);
+yaql_function!("split", split_whitespace(s: String) -> Vec<Primitive> {
+    s.split_whitespace().map(|p| Primitive::String(p.to_string())).collect()
+});
 
-pub fn right_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::String(sep) = &args[1] else { return Primitive::Null };
+yaql_function!("split", split_delim(s: String, sep: String) -> Vec<Primitive> {
     if sep.is_empty() {
-        return Primitive::Array(s.chars().map(|c| Primitive::String(c.to_string())).collect());
+        s.chars().map(|c| Primitive::String(c.to_string())).collect()
+    } else {
+        s.split(sep.as_str()).map(|p| Primitive::String(p.to_string())).collect()
     }
-    let count = if args.len() > 2 {
-        if let Primitive::Int(n) = &args[2] { *n as usize } else { 0 }
-    } else { 0 };
-    let parts: Vec<&str> = s.rsplitn(count + 1, sep.as_str()).collect();
-    Primitive::Array(parts.into_iter().rev().map(|p| Primitive::String(p.to_string())).collect())
-}
-yaql_raw_function!("rightSplit", right_split_fn, ArgSpec::Min(2), [Type::String, Type::String], false);
+});
+
+yaql_function!("rightSplit", right_split_2(s: String, sep: String) -> Vec<Primitive> {
+    if sep.is_empty() {
+        s.chars().map(|c| Primitive::String(c.to_string())).collect()
+    } else {
+        let parts: Vec<&str> = s.rsplitn(1, sep.as_str()).collect();
+        parts.into_iter().rev().map(|p| Primitive::String(p.to_string())).collect()
+    }
+});
+
+yaql_function!("rightSplit", right_split_3(s: String, sep: String, count: i64) -> Vec<Primitive> {
+    if sep.is_empty() {
+        s.chars().map(|c| Primitive::String(c.to_string())).collect()
+    } else {
+        let parts: Vec<&str> = s.rsplitn((count as usize) + 1, sep.as_str()).collect();
+        parts.into_iter().rev().map(|p| Primitive::String(p.to_string())).collect()
+    }
+});
 
 // --- join ---
 
-fn primitive_to_str(p: &Primitive) -> String {
+pub(crate) fn primitive_to_str(p: &Primitive) -> String {
     match p {
         Primitive::String(s) => s.clone(),
         Primitive::Int(n) => n.to_string(),
@@ -74,21 +76,15 @@ fn primitive_to_str(p: &Primitive) -> String {
     }
 }
 
-pub fn join_method(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Primitive::String(sep) = &args[1] else { return Primitive::Null };
-    let parts: Vec<String> = arr.iter().map(primitive_to_str).collect();
-    Primitive::String(parts.join(sep))
-}
-yaql_raw_function!("join", join_method, ArgSpec::Exact(2), [Type::Array, Type::String], false);
+yaql_function!("join", join_method(arr: Vec<Primitive>, sep: String) -> String {
+    let parts: Vec<String> = arr.iter().map(crate::lang::strings::primitive_to_str).collect();
+    parts.join(sep.as_str())
+});
 
-pub fn join_pythonic(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(sep) = &args[0] else { return Primitive::Null };
-    let Primitive::Array(arr) = &args[1] else { return Primitive::Null };
-    let parts: Vec<String> = arr.iter().map(primitive_to_str).collect();
-    Primitive::String(parts.join(sep))
-}
-yaql_raw_function!("join", join_pythonic, ArgSpec::Exact(2), [Type::String, Type::Array], false);
+yaql_function!("join", join_pythonic(sep: String, arr: Vec<Primitive>) -> String {
+    let parts: Vec<String> = arr.iter().map(crate::lang::strings::primitive_to_str).collect();
+    parts.join(sep.as_str())
+});
 
 // --- trim ---
 
@@ -117,20 +113,13 @@ yaql_function!("norm", norm_null(_n: Null) -> Null { Null });
 
 // --- replace ---
 
-pub fn replace_str(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::String(old) = &args[1] else { return Primitive::Null };
-    let Primitive::String(new) = &args[2] else { return Primitive::Null };
-    if old.is_empty() { return Primitive::String(s.clone()); }
-    let result = if args.len() > 3 {
-        let Primitive::Int(count) = args[3] else { return Primitive::String(s.clone()); };
-        s.replacen(old.as_str(), new.as_str(), count as usize)
-    } else {
-        s.replace(old.as_str(), new.as_str())
-    };
-    Primitive::String(result)
-}
-yaql_raw_function!("replace", replace_str, ArgSpec::Min(3), [Type::String, Type::String, Type::String], false);
+yaql_function!("replace", replace_str_3(s: String, old: String, new: String) -> String {
+    if old.is_empty() { s } else { s.replace(old.as_str(), new.as_str()) }
+});
+
+yaql_function!("replace", replace_str_4(s: String, old: String, new: String, count: i64) -> String {
+    if old.is_empty() { s } else { s.replacen(old.as_str(), new.as_str(), count as usize) }
+});
 
 pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Primitive::String(s) = &args[0] else { return Primitive::Null };
@@ -151,7 +140,15 @@ pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -
     } else { None };
 
     if dict.is_none() {
-        return replace_str(args, kwargs);
+        let Primitive::String(old) = &args[1] else { return Primitive::String(s.clone()); };
+        let Primitive::String(new) = &args[2] else { return Primitive::String(s.clone()); };
+        if old.is_empty() { return Primitive::String(s.clone()); }
+        let result = if let Some(c) = count {
+            s.replacen(old.as_str(), new.as_str(), c as usize)
+        } else {
+            s.replace(old.as_str(), new.as_str())
+        };
+        return Primitive::String(result);
     }
 
     let mut result = s.clone();
@@ -172,94 +169,113 @@ yaql_raw_function!("replace", replace_dict, ArgSpec::Min(1), [Type::String], tru
 
 // --- substring ---
 
-pub fn substring_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+yaql_function!("substring", substring_2(s: String, start: i64) -> String {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = match &args[1] {
-        Primitive::Int(n) => if *n < 0 { (len + n).max(0) as usize } else { (*n as usize).min(len as usize) },
-        _ => return Primitive::Null,
-    };
-    let end = if args.len() > 2 {
-        match &args[2] {
-            Primitive::Int(n) => {
-                if *n < 0 { (len + n + 1).max(0) as usize }
-                else { (start as i64 + n) as usize }
-            }
-            _ => return Primitive::Null,
-        }
-    } else {
-        len as usize
-    };
+    let start = if start < 0 { (len + start).max(0) as usize } else { (start as usize).min(len as usize) };
+    chars[start..].iter().collect()
+});
+
+yaql_function!("substring", substring_3(s: String, start: i64, length: i64) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    let start = if start < 0 { (len + start).max(0) as usize } else { (start as usize).min(len as usize) };
+    let end = if length < 0 { (len + length + 1).max(0) as usize } else { (start as i64 + length) as usize };
     let end = end.min(len as usize);
-    if end < start { return Primitive::String(String::new()); }
-    Primitive::String(chars[start..end].iter().collect())
-}
-yaql_raw_function!("substring", substring_fn, ArgSpec::Min(2), [Type::String, Type::Int], false);
+    if end < start { String::new() } else { chars[start..end].iter().collect() }
+});
 
 // --- indexOf / lastIndexOf ---
 
-pub fn index_of_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::String(needle) = &args[1] else { return Primitive::Null };
+pub(crate) fn norm_start(len: i64, start: i64) -> usize {
+    if start < 0 { (len + start).max(0) as usize } else { (start as usize).min(len as usize) }
+}
+
+pub(crate) fn norm_end(len: i64, start: usize, end: i64) -> usize {
+    if end < 0 { (len + end + 1).max(0) as usize }
+    else if (end as usize) < start { (start + end as usize).min(len as usize) }
+    else { (end as usize).min(len as usize) }
+}
+
+yaql_function!("indexOf", index_of_2(s: String, needle: String) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = if args.len() > 2 {
-        match &args[2] { Primitive::Int(n) => if *n < 0 { (len + n).max(0) as usize } else { (*n as usize).min(len as usize) }, _ => 0 }
-    } else { 0 };
-    let end = if args.len() > 3 {
-        match &args[3] {
-            Primitive::Int(n) => {
-                let e = if *n < 0 { (len + n + 1).max(0) as usize }
-                        else if (*n as usize) < start { (start + *n as usize).min(len as usize) }
-                        else { (*n as usize).min(len as usize) };
-                e
-            }
-            _ => len as usize,
-        }
-    } else { len as usize };
-    if end < start { return Primitive::Int(-1); }
+    let start = 0usize;
+    let end = len as usize;
     let hay: String = chars[start..end].iter().collect();
     match hay.find(needle.as_str()) {
-        Some(pos) => {
-            let char_pos = hay[..pos].chars().count();
-            Primitive::Int((start + char_pos) as i64)
-        }
-        None => Primitive::Int(-1),
+        Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+        None => -1,
     }
-}
-yaql_raw_function!("indexOf", index_of_fn, ArgSpec::Min(2), [Type::String, Type::String], false);
+});
 
-pub fn last_index_of_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::String(needle) = &args[1] else { return Primitive::Null };
+yaql_function!("indexOf", index_of_3(s: String, needle: String, start: i64) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = if args.len() > 2 {
-        match &args[2] { Primitive::Int(n) => if *n < 0 { (len + n).max(0) as usize } else { (*n as usize).min(len as usize) }, _ => 0 }
-    } else { 0 };
-    let end = if args.len() > 3 {
-        match &args[3] {
-            Primitive::Int(n) => {
-                let e = if *n < 0 { (len + n + 1).max(0) as usize }
-                        else if (*n as usize) < start { (start + *n as usize).min(len as usize) }
-                        else { (*n as usize).min(len as usize) };
-                e
-            }
-            _ => len as usize,
+    let start = crate::lang::strings::norm_start(len, start);
+    let end = len as usize;
+    if end < start { -1 } else {
+        let hay: String = chars[start..end].iter().collect();
+        match hay.find(needle.as_str()) {
+            Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+            None => -1,
         }
-    } else { len as usize };
-    if end < start { return Primitive::Int(-1); }
+    }
+});
+
+yaql_function!("indexOf", index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    let start = crate::lang::strings::norm_start(len, start);
+    let end = crate::lang::strings::norm_end(len, start, end);
+    if end < start { -1 } else {
+        let hay: String = chars[start..end].iter().collect();
+        match hay.find(needle.as_str()) {
+            Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+            None => -1,
+        }
+    }
+});
+
+yaql_function!("lastIndexOf", last_index_of_2(s: String, needle: String) -> i64 {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    let start = 0usize;
+    let end = len as usize;
     let hay: String = chars[start..end].iter().collect();
     match hay.rfind(needle.as_str()) {
-        Some(pos) => {
-            let char_pos = hay[..pos].chars().count();
-            Primitive::Int((start + char_pos) as i64)
-        }
-        None => Primitive::Int(-1),
+        Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+        None => -1,
     }
-}
-yaql_raw_function!("lastIndexOf", last_index_of_fn, ArgSpec::Min(2), [Type::String, Type::String], false);
+});
+
+yaql_function!("lastIndexOf", last_index_of_3(s: String, needle: String, start: i64) -> i64 {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    let start = crate::lang::strings::norm_start(len, start);
+    let end = len as usize;
+    if end < start { -1 } else {
+        let hay: String = chars[start..end].iter().collect();
+        match hay.rfind(needle.as_str()) {
+            Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+            None => -1,
+        }
+    }
+});
+
+yaql_function!("lastIndexOf", last_index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    let start = crate::lang::strings::norm_start(len, start);
+    let end = crate::lang::strings::norm_end(len, start, end);
+    if end < start { -1 } else {
+        let hay: String = chars[start..end].iter().collect();
+        match hay.rfind(needle.as_str()) {
+            Some(pos) => { let char_pos = hay[..pos].chars().count(); (start + char_pos) as i64 }
+            None => -1,
+        }
+    }
+});
 
 // --- startsWith / endsWith with varargs ---
 

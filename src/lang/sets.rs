@@ -1,5 +1,4 @@
 use crate::lang::primitive::{Primitive, primitive_eq};
-use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, SetVec};
 use crate::yaql_function;
 use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
@@ -97,11 +96,9 @@ pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
 }
 yaql_raw_function!("remove", set_remove, ArgSpec::Min(2), [Type::Set], false);
 
-pub fn set_contains(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Set(elems) = &args[0] else { return Primitive::Boolean(false) };
-    Primitive::Boolean(elems.iter().any(|e| primitive_eq(e, &args[1])))
-}
-yaql_raw_function!("contains", set_contains, ArgSpec::Exact(2), [Type::Set, Type::Any], false);
+yaql_function!("contains", set_contains(elems: SetVec, item: Any) -> bool {
+    elems.0.iter().any(|e| crate::lang::primitive::primitive_eq(e, &item.0))
+});
 
 yaql_function!("toSet", to_set_fn(arr: Vec<Primitive>) -> SetVec {
     let mut seen = Vec::new();
