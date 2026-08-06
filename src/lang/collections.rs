@@ -32,8 +32,11 @@ yaql_function!("items", items_fn(m: HashMap<String, Primitive>) -> Vec<Primitive
     }).collect()
 });
 
-yaql_function!("containsKey", contains_key_fn(m: HashMap<String, Primitive>, key: String) -> bool {
+yaql_function!("containsKey", contains_key_str(m: HashMap<String, Primitive>, key: String) -> bool {
     m.contains_key(&key)
+});
+yaql_function!("containsKey", contains_key_any(m: HashMap<String, Primitive>, _key: Any) -> bool {
+    false
 });
 
 pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
@@ -161,6 +164,11 @@ yaql_raw_function!("contains", contains_string, ArgSpec::Exact(2), [Type::String
 pub fn max(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let iter: Vec<Primitive> = if args.len() == 1 {
         match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
+    } else if args.len() == 2 && matches!(&args[0], Primitive::Array(_) | Primitive::Set(_)) {
+        // Method form: collection.max(default) — return default if empty
+        let coll = match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), _ => vec![] };
+        if coll.is_empty() { return args[1].clone(); }
+        coll
     } else { args };
     let mut result: Option<Primitive> = None;
     for arg in iter {
@@ -177,6 +185,10 @@ yaql_raw_function!("max", max, ArgSpec::Min(1), [], false);
 pub fn min(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let iter: Vec<Primitive> = if args.len() == 1 {
         match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
+    } else if args.len() == 2 && matches!(&args[0], Primitive::Array(_) | Primitive::Set(_)) {
+        let coll = match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), _ => vec![] };
+        if coll.is_empty() { return args[1].clone(); }
+        coll
     } else { args };
     let mut result: Option<Primitive> = None;
     for arg in iter {

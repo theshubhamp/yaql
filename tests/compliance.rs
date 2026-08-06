@@ -674,6 +674,37 @@ compliance_cases! {
     case_is_regex_true: "isRegex(regex(\"a.b\"))", Value::Null;
     case_is_regex_123: "isRegex(123)", Value::Null;
     case_is_regex_abc: "isRegex(abc)", Value::Null;
+
+    // ========================================================================= //
+    // Edge case fixes: first/last default, max/min init, range 3-arg,
+    // enumerate, single, slice, containsKey null
+    // ========================================================================= //
+    case_first_null_default: "list().first(null)", Value::Null;
+    case_first_default: "list().first(99)", Value::Null;
+    case_last_null_default: "list().last(null)", Value::Null;
+    case_last_default: "list().last(99)", Value::Null;
+    case_max_empty_init: "[].max(0)", Value::Null;
+    case_min_empty_init: "[].min(0)", Value::Null;
+    case_range_3: "range(4, 1, -1)", Value::Null;
+    case_enumerate: "$.enumerate()", json!([1, 2, 3]);
+    case_enumerate_3: "$.enumerate(3)", json!([1, 2, 3]);
+    case_enumerate_fn: "enumerate($)", json!([1, 2, 3]);
+    case_enumerate_fn_3: "enumerate($, 3)", json!([1, 2, 3]);
+    case_single_2: "list(2).single()", Value::Null;
+    case_slice_range: "range(1, 6).slice(2)", Value::Null;
+    case_slice_list: "[1,2,3,4,5].slice(2)", Value::Null;
+    case_contains_key_null: "$.containsKey(null)", json!({"a": 12, "b": 44});
+
+    // ========================================================================= //
+    // any/all no-predicate, defaultIfEmpty
+    // ========================================================================= //
+    case_any_empty: "$.any()", json!([]);
+    case_any_nonempty: "$.any()", json!([0]);
+    case_all_empty: "$.all()", json!([]);
+    case_all_nonempty: "$.all()", json!([1, 2]);
+    case_all_false: "$.all()", json!([1, 0]);
+    case_default_if_empty: "[].defaultIfEmpty([1, 2])", Value::Null;
+    case_default_if_empty_nonempty: "[3, 4].defaultIfEmpty([1, 2])", Value::Null;
 }
 
 ignored_compliance_cases! {
@@ -710,7 +741,6 @@ ignored_compliance_cases! {
     case_ignored_dict_dict_key: "dict($ => 3).get($)", json!({"a": 1});
     case_ignored_dict_eq_list_key_diff: "{[c, 55] => a} = {[c, 56] => a}", Value::Null;
     case_ignored_dict_neq_list_key_diff: "{[c, 55] => a} != {[c, 56] => a}", Value::Null;
-    case_ignored_contains_key_null: "$.containsKey(null)", json!({"a": 12, "b": 44});
     case_ignored_contains_select: "$.values().select(2*$).contains(24)", json!({"a": 12, "b": 44});
     case_ignored_in_select: "24 in $.values().select(2*$)", json!({"a": 12, "b": 44});
 
@@ -720,37 +750,20 @@ ignored_compliance_cases! {
     case_ignored_keyword_access: "$.a", json!([{"a": 2}, {"a": 4}]);
     case_ignored_keyword_access_select: "$.select($).a", json!([{"a": 2}, {"a": 4}]);
     case_ignored_complex_query: "$.where($ < 4).select($ * $).skip(1).limit(1)", json!([1, 2, 3, 4, 5, 6]);
-    case_ignored_any_empty: "$.any()", json!([]);
-    case_ignored_any_nonempty: "$.any()", json!([0]);
-    case_ignored_all_empty: "$.all()", json!([]);
-    case_ignored_all_nonempty: "$.all()", json!([1, 2]);
-    case_ignored_all_false: "$.all()", json!([1, 0]);
     case_ignored_all_pred_false: "$.all($ > 1)", json!([2, 1]);
     case_ignored_all_pred: "$.all($ > 1)", json!([2, 3]);
     case_ignored_order_by: "$.orderBy($)", json!([4, 2, 1, 3]);
     case_ignored_order_by_desc: "$.orderByDescending($)", json!([4, 2, 1, 3]);
     case_ignored_reverse: "range(1, 4).select($*$).reverse()", Value::Null;
     case_ignored_first_select: "list(2, 3).select($ * 2).first()", Value::Null;
-    case_ignored_first_null_default: "list().first(null)", Value::Null;
-    case_ignored_first_default: "list().first(99)", Value::Null;
     case_ignored_last_select: "list(2, 3).select($ * 2).last()", Value::Null;
-    case_ignored_last_null_default: "list().last(null)", Value::Null;
-    case_ignored_last_default: "list().last(99)", Value::Null;
-    case_ignored_max_empty_init: "[].max(0)", Value::Null;
-    case_ignored_min_empty_init: "[].min(0)", Value::Null;
 
     // test_queries.py — other unimplemented features
     case_ignored_distinct_sel_method: "$.distinct($[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
     case_ignored_distinct_sel_fn: "distinct($, $[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
-    case_ignored_enumerate: "$.enumerate()", json!([1, 2, 3]);
-    case_ignored_enumerate_3: "$.enumerate(3)", json!([1, 2, 3]);
-    case_ignored_enumerate_fn: "enumerate($)", json!([1, 2, 3]);
-    case_ignored_enumerate_fn_3: "enumerate($, 3)", json!([1, 2, 3]);
     case_ignored_concat_method: "$.select($).concat($.select(2 * $))", json!([1, 2, 3]);
     case_ignored_concat_fn: "concat($, $.select(2 * $), $)", json!([1, 2, 3]);
     case_ignored_memorize: "let($.memorize()) -> $.len() + $.sum()", json!([0, 1, 2]);
-    case_ignored_single_2: "list(2).single()", Value::Null;
-    case_ignored_range_3: "range(4, 1, -1)", Value::Null;
     case_ignored_select_many: "range(4).selectMany(range($))", Value::Null;
     case_ignored_select_many_scalar: "range(2).selectMany(xx)", Value::Null;
     case_ignored_order_by_thenBy: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
@@ -781,8 +794,6 @@ ignored_compliance_cases! {
     case_ignored_index_where_22: "[1, 2, 3, 2, 1].indexWhere($ = 22)", Value::Null;
     case_ignored_last_index_where: "[1, 2, 3, 2, 1].lastIndexWhere($ = 2)", Value::Null;
     case_ignored_last_index_where_22: "[1, 2, 3, 2, 1].lastIndexWhere($ = 22)", Value::Null;
-    case_ignored_slice_range: "range(1, 6).slice(2)", Value::Null;
-    case_ignored_slice_list: "[1,2,3,4,5].slice(2)", Value::Null;
     case_ignored_split_where: "range(1, 6).splitWhere($ mod 3 = 1)", Value::Null;
     case_ignored_slice_where: "[a,a,b,a,a].sliceWhere($ != a)", Value::Null;
     case_ignored_aggregate: "[a,a,b,a,a].aggregate($1 + $2)", Value::Null;
@@ -791,8 +802,6 @@ ignored_compliance_cases! {
     case_ignored_reduce_init: "[].reduce(max($1, $2), 0)", Value::Null;
     case_ignored_accumulate: "[a,a,b,a,a].accumulate($1 + $2)", Value::Null;
     case_ignored_accumulate_init: "[].accumulate($1 + $2, 1)", Value::Null;
-    case_ignored_default_if_empty: "[].defaultIfEmpty([1, 2])", Value::Null;
-    case_ignored_default_if_empty_nonempty: "[3, 4].defaultIfEmpty([1, 2])", Value::Null;
     case_ignored_generate: "generate(0, $ < 10, $ + 2)", Value::Null;
     case_ignored_generate_proj: "generate(0, $ < 10, $ + 2, $ * $)", Value::Null;
     case_ignored_generate_many: "generateMany(John, $data.get($, []), decycle => true)", json!({"John": ["Jim"], "Jim": ["Jay", "Jax"], "Jax": ["John", "Jacob", "Jonathan"], "Jacob": ["Jonathan", "Jenifer"]});
