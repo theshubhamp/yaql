@@ -799,15 +799,34 @@ compliance_cases! {
     // ========================================================================= //
     case_group_by_agg_kw: "$.items().orderBy($[0]).groupBy($[1], aggregator => $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_group_by_agg_no_sel: "$.items().orderBy($[0]).groupBy($[1],,  $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
+
+    // ========================================================================= //
+    // Leading-dash expressions (both CLIs reject via optparse)
+    // ========================================================================= //
+    case_unary_minus_4: "-4", Value::Null;
+    case_unary_minus_12f: "-12.0", Value::Null;
+    case_mul_neg_neg: "-3 * -2", Value::Null;
+    case_mul_float_neg_neg: "-3.1 * -2.1", Value::Null;
+    case_div_float_neg: "-5.0 / 2.0", Value::Null;
+
+    // ========================================================================= //
+    // thenBy/thenByDescending (compound sort with stored sort keys)
+    // ========================================================================= //
+    case_order_by_thenBy: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_desc_thenBy: "$.orderByDescending($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_by_thenByDesc: "$.orderBy($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_desc_thenByDesc: "$.orderByDescending($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+
+    // ========================================================================= //
+    // repeat, cycle (infinite iterators capped at 10000)
+    // ========================================================================= //
+    case_repeat_2: "null.repeat(2)", Value::Null;
+    case_repeat_inf: "1.repeat().limit(5)", Value::Null;
+    case_cycle: "[1, 2].cycle().take(5)", Value::Null;
 }
 
 ignored_compliance_cases! {
     // Leading-dash expressions rejected by reference CLI (optparse)
-    case_ignored_unary_minus_4: "-4", Value::Null;
-    case_ignored_unary_minus_12f: "-12.0", Value::Null;
-    case_ignored_mul_neg_neg: "-3 * -2", Value::Null;
-    case_ignored_div_float_neg: "-5.0 / 2.0", Value::Null;
-    case_ignored_mul_float_neg_neg: "-3.1 * -2.1", Value::Null;
 
     // test_math.py — random needs let/with
 
@@ -824,16 +843,9 @@ ignored_compliance_cases! {
     // test_queries.py — lambda queries not yet implemented
 
     // test_queries.py — other unimplemented features
-    case_ignored_order_by_thenBy: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_ignored_order_by_thenByDesc: "$.orderBy($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_ignored_order_desc_thenBy: "$.orderByDescending($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_ignored_order_desc_thenByDesc: "$.orderByDescending($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
     case_ignored_group_by_old: "$.items().orderBy($[0]).groupBy($[1], $[0], [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_ignored_group_by_old_no_sel: "$.items().orderBy($[0]).groupBy($[1],,  [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_ignored_group_by_old_kw: "$.items().orderBy($[0]).groupBy($[1], aggregator => [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_repeat_2: "null.repeat(2)", Value::Null;
-    case_ignored_repeat_inf: "1.repeat().limit(5)", Value::Null;
-    case_ignored_cycle: "[1, 2].cycle().take(5)", Value::Null;
     case_ignored_merge_with_min: "$.d1.mergeWith($.d2,, min($1, $2))", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
 
     // test_regex.py — regex support (lambda-dependent cases stay ignored)

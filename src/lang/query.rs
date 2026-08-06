@@ -5,6 +5,26 @@ use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
 use crate::lang::functions::Type;
 use crate::interpreter::eval_lambda;
+use std::cell::RefCell;
+
+// Thread-local storage for sort keys (for thenBy/thenByDescending)
+// Each element's sort key is a Vec<Primitive> (multiple sort keys compound)
+// SORT_DESC tracks whether each key position was sorted descending
+thread_local! {
+    static SORT_KEYS: RefCell<Vec<Vec<Primitive>>> = RefCell::new(Vec::new());
+    static SORT_DESC: RefCell<Vec<bool>> = RefCell::new(Vec::new());
+}
+
+fn store_sort_keys(keys: Vec<Vec<Primitive>>, desc: Vec<bool>) {
+    SORT_KEYS.with(|sk| { *sk.borrow_mut() = keys; });
+    SORT_DESC.with(|sd| { *sd.borrow_mut() = desc; });
+}
+
+fn load_sort_keys() -> (Vec<Vec<Primitive>>, Vec<bool>) {
+    let keys = SORT_KEYS.with(|sk| sk.borrow().clone());
+    let desc = SORT_DESC.with(|sd| sd.borrow().clone());
+    (keys, desc)
+}
 
 yaql_function!("skip", skip(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
     let n = (n as usize).min(arr.len());
@@ -240,20 +260,25 @@ pub fn select_many_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 }
 yaql_raw_function!("selectMany", select_many_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
 
-// orderBy: array.orderBy(selector) -> sorted array
+// orderBy: array.orderBy(selector) -> sorted array (stores sort keys for thenBy)
 pub fn order_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
     let Some(lambda) = get_lambda(&args, 1) else {
-        // No selector — sort by identity
         let mut sorted = arr.clone();
         sorted.sort_by(|a, b| crate::lang::compare(a, b));
+        let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
+        store_sort_keys(keys, vec![false]);
         return Primitive::Array(sorted);
     };
-    let mut keyed: Vec<(Primitive, Primitive)> = arr.iter()
+    let keyed: Vec<(Primitive, Primitive)> = arr.iter()
         .map(|e| (eval_lambda(lambda, e.clone()), e.clone()))
         .collect();
-    keyed.sort_by(|(ka, _), (kb, _)| crate::lang::compare(ka, kb));
-    Primitive::Array(keyed.into_iter().map(|(_, v)| v).collect())
+    let mut indices: Vec<usize> = (0..keyed.len()).collect();
+    indices.sort_by(|&a, &b| crate::lang::compare(&keyed[a].0, &keyed[b].0));
+    let sorted: Vec<Primitive> = indices.iter().map(|&i| keyed[i].1.clone()).collect();
+    let sort_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| vec![keyed[i].0.clone()]).collect();
+    store_sort_keys(sort_keys, vec![false]);
+    Primitive::Array(sorted)
 }
 yaql_raw_function!("orderBy", order_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
 
@@ -263,40 +288,90 @@ pub fn order_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive
     let Some(lambda) = get_lambda(&args, 1) else {
         let mut sorted = arr.clone();
         sorted.sort_by(|a, b| crate::lang::compare(b, a));
+        let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
+        store_sort_keys(keys, vec![true]);
         return Primitive::Array(sorted);
     };
-    let mut keyed: Vec<(Primitive, Primitive)> = arr.iter()
+    let keyed: Vec<(Primitive, Primitive)> = arr.iter()
         .map(|e| (eval_lambda(lambda, e.clone()), e.clone()))
         .collect();
-    keyed.sort_by(|(ka, _), (kb, _)| crate::lang::compare(kb, ka));
-    Primitive::Array(keyed.into_iter().map(|(_, v)| v).collect())
+    let mut indices: Vec<usize> = (0..keyed.len()).collect();
+    indices.sort_by(|&a, &b| crate::lang::compare(&keyed[b].0, &keyed[a].0));
+    let sorted: Vec<Primitive> = indices.iter().map(|&i| keyed[i].1.clone()).collect();
+    let sort_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| vec![keyed[i].0.clone()]).collect();
+    store_sort_keys(sort_keys, vec![true]);
+    Primitive::Array(sorted)
 }
 yaql_raw_function!("orderByDescending", order_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
 
-// thenBy (stable sort by secondary key, preserving primary order)
+// thenBy (compound sort: sort by new key, tiebreak by previous keys)
 pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
     let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Array(arr.clone()); };
-    let keyed: Vec<(Primitive, usize)> = arr.iter().enumerate()
-        .map(|(i, e)| (eval_lambda(lambda, e.clone()), i))
-        .collect();
-    let mut indices: Vec<usize> = (0..keyed.len()).collect();
-    indices.sort_by(|&a, &b| crate::lang::compare(&keyed[a].0, &keyed[b].0));
-    Primitive::Array(indices.into_iter().map(|i| arr[i].clone()).collect())
+    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(lambda, e.clone())).collect();
+    let (prev_keys, prev_desc) = load_sort_keys();
+    let has_prev = prev_keys.len() == arr.len();
+    let mut indices: Vec<usize> = (0..arr.len()).collect();
+    if has_prev {
+        indices.sort_by(|&a, &b| {
+            compare_key_vectors_with_desc(&prev_keys[a], &prev_keys[b], &prev_desc)
+                .then_with(|| crate::lang::compare(&new_keys[a], &new_keys[b]))
+        });
+    } else {
+        indices.sort_by(|&a, &b| crate::lang::compare(&new_keys[a], &new_keys[b]));
+    }
+    let sorted: Vec<Primitive> = indices.iter().map(|&i| arr[i].clone()).collect();
+    let combined_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| {
+        let mut all = prev_keys.get(i).cloned().unwrap_or_default();
+        all.push(new_keys[i].clone());
+        all
+    }).collect();
+    let mut combined_desc = prev_desc.clone();
+    combined_desc.push(false);
+    store_sort_keys(combined_keys, combined_desc);
+    Primitive::Array(sorted)
 }
 yaql_raw_function!("thenBy", then_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
 
 pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
     let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Array(arr.clone()); };
-    let keyed: Vec<(Primitive, usize)> = arr.iter().enumerate()
-        .map(|(i, e)| (eval_lambda(lambda, e.clone()), i))
-        .collect();
-    let mut indices: Vec<usize> = (0..keyed.len()).collect();
-    indices.sort_by(|&a, &b| crate::lang::compare(&keyed[b].0, &keyed[a].0));
-    Primitive::Array(indices.into_iter().map(|i| arr[i].clone()).collect())
+    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(lambda, e.clone())).collect();
+    let (prev_keys, prev_desc) = load_sort_keys();
+    let has_prev = prev_keys.len() == arr.len();
+    let mut indices: Vec<usize> = (0..arr.len()).collect();
+    if has_prev {
+        indices.sort_by(|&a, &b| {
+            compare_key_vectors_with_desc(&prev_keys[a], &prev_keys[b], &prev_desc)
+                .then_with(|| crate::lang::compare(&new_keys[b], &new_keys[a]))
+        });
+    } else {
+        indices.sort_by(|&a, &b| crate::lang::compare(&new_keys[b], &new_keys[a]));
+    }
+    let sorted: Vec<Primitive> = indices.iter().map(|&i| arr[i].clone()).collect();
+    let combined_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| {
+        let mut all = prev_keys.get(i).cloned().unwrap_or_default();
+        all.push(new_keys[i].clone());
+        all
+    }).collect();
+    let mut combined_desc = prev_desc.clone();
+    combined_desc.push(true);
+    store_sort_keys(combined_keys, combined_desc);
+    Primitive::Array(sorted)
 }
 yaql_raw_function!("thenByDescending", then_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+
+fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[bool]) -> std::cmp::Ordering {
+    for (i, (ka, kb)) in a.iter().zip(b.iter()).enumerate() {
+        let ord = if desc.get(i).copied().unwrap_or(false) {
+            crate::lang::compare(kb, ka)
+        } else {
+            crate::lang::compare(ka, kb)
+        };
+        if ord != std::cmp::Ordering::Equal { return ord; }
+    }
+    a.len().cmp(&b.len())
+}
 
 // takeWhile
 pub fn take_while_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
@@ -718,3 +793,28 @@ pub fn generate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
     Primitive::Array(result)
 }
 yaql_raw_function!("generate", generate_fn, ArgSpec::Min(3), [Type::Any, Type::Any, Type::Any], false);
+
+// --- repeat ---
+// repeat(value, count) -> array of value repeated count times
+// repeat(value) -> infinite (capped at 10000 for take/limit)
+pub fn repeat_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let value = args.get(0).cloned().unwrap_or(Primitive::Null);
+    if args.len() > 1 {
+        if let Primitive::Int(n) = &args[1] {
+            return Primitive::Array((0..*n).map(|_| value.clone()).collect());
+        }
+    }
+    // Infinite repeat — cap at 10000
+    Primitive::Array((0..10000).map(|_| value.clone()).collect())
+}
+yaql_raw_function!("repeat", repeat_fn, ArgSpec::Min(1), [Type::Any], false);
+
+// --- cycle ---
+// cycle(array) -> infinite cycling of array elements (capped at 10000)
+pub fn cycle_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
+    if arr.is_empty() { return Primitive::Array(Vec::new()); }
+    let result: Vec<Primitive> = (0..10000).map(|i| arr[i % arr.len()].clone()).collect();
+    Primitive::Array(result)
+}
+yaql_raw_function!("cycle", cycle_fn, ArgSpec::Exact(1), [Type::Array], false);
