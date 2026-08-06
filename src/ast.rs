@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     StringLiteral(String),
     IntLiteral(i64),
@@ -13,6 +13,7 @@ pub enum Value {
     List(Vec<Value>),
     Dict(Vec<(Value, Value)>),
     Index(Box<Value>, Vec<Value>),
+    Lambda(Box<Value>, Box<Value>),
 }
 
 pub trait Expression<T> {
@@ -34,4 +35,5 @@ pub trait Visitor<T> {
     fn visit_list(&self, elements: Vec<Value>) -> T;
     fn visit_dict(&self, entries: Vec<(Value, Value)>) -> T;
     fn visit_index(&self, collection: Value, indices: Vec<Value>) -> T;
+    fn visit_lambda(&self, left: Value, right: Value) -> T;
 }

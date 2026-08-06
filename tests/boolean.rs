@@ -5,7 +5,7 @@ use yaql::parser::Parser;
 
 #[test]
 fn interpret_and() {
-    let interpreter = Interpreter{ context: Primitive::Null };
+    let interpreter = Interpreter::new(Primitive::Null);
 
     let parse_result = Parser::parse("true and true");
     let ast = parse_result.unwrap();
@@ -52,7 +52,7 @@ fn interpret_and() {
 
 #[test]
 fn interpret_or() {
-    let interpreter = Interpreter{ context: Primitive::Null };
+    let interpreter = Interpreter::new(Primitive::Null);
 
     let parse_result = Parser::parse("true or true");
     let ast = parse_result.unwrap();
@@ -99,7 +99,7 @@ fn interpret_or() {
 
 #[test]
 fn interpret_eq() {
-    let interpreter = Interpreter{ context: Primitive::Null };
+    let interpreter = Interpreter::new(Primitive::Null);
 
     let parse_result = Parser::parse("false = false");
     let ast = parse_result.unwrap();

@@ -59,5 +59,6 @@ pub fn primitive_to_json(value: &Primitive) -> serde_json::Value {
             serde_json::Value::Object(obj)
         }
         Primitive::Regex(_) => serde_json::Value::Null,
+        Primitive::Lambda(_) => serde_json::Value::Null,
     }
 }

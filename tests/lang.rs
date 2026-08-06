@@ -8,7 +8,7 @@ fn interpret_string() {
     let parse_result = Parser::parse("'string'");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Null).visit(ast).unwrap();
     match result {
         Primitive::String(string) => {
             assert_eq!(string, "string");
@@ -24,7 +24,7 @@ fn interpret_number() {
     let parse_result = Parser::parse("4.2");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Null).visit(ast).unwrap();
     match result {
         Primitive::Float(num) => {
             assert_eq!(num, 4.2);
@@ -40,7 +40,7 @@ fn interpret_boolean() {
     let parse_result = Parser::parse("false");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Null).visit(ast).unwrap();
     match result {
         Primitive::Boolean(bool) => {
             assert_eq!(bool, false);
@@ -51,7 +51,7 @@ fn interpret_boolean() {
     let parse_result = Parser::parse("true");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Null).visit(ast).unwrap();
     match result {
         Primitive::Boolean(bool) => {
             assert_eq!(bool, true);
@@ -67,7 +67,7 @@ fn interpret_null() {
     let parse_result = Parser::parse("null");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Null }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Null).visit(ast).unwrap();
     match result {
         Primitive::Null => {}
         _ => panic!("expected Null"),
@@ -81,7 +81,7 @@ fn interpret_dollar() {
     let parse_result = Parser::parse("$");
     let ast = parse_result.unwrap();
 
-    let result = Interpreter{ context: Primitive::Int(12) }.visit(ast).unwrap();
+    let result = Interpreter::new(Primitive::Int(12)).visit(ast).unwrap();
     match result {
         Primitive::Int(num) => assert_eq!(num, 12),
         _ => panic!("expected Null"),

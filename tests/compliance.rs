@@ -705,116 +705,136 @@ compliance_cases! {
     case_all_false: "$.all()", json!([1, 0]);
     case_default_if_empty: "[].defaultIfEmpty([1, 2])", Value::Null;
     case_default_if_empty_nonempty: "[3, 4].defaultIfEmpty([1, 2])", Value::Null;
+
+    // ========================================================================= //
+    // Lambda: where, select, orderBy, takeWhile, skipWhile, any/all predicate,
+    // distinct selector, indexWhere, aggregate, reduce, accumulate, toDict,
+    // selectMany, concat, keyword access, leading-dash (both reject)
+    // ========================================================================= //
+    case_where: "$.where($ > 3)", json!([1, 2, 3, 4, 5, 6]);
+    case_select: "$.select($ * $)", json!([1, 2, 3]);
+    case_complex_query: "$.where($ < 4).select($ * $).skip(1).limit(1)", json!([1, 2, 3, 4, 5, 6]);
+    case_order_by: "$.orderBy($)", json!([4, 2, 1, 3]);
+    case_order_by_desc: "$.orderByDescending($)", json!([4, 2, 1, 3]);
+    case_take_while: "[1, 2, 3, 4, 5].takeWhile($ < 4)", Value::Null;
+    case_skip_while: "[1, 2, 3, 4, 5].skipWhile($ < 4)", Value::Null;
+    case_all_pred: "$.all($ > 1)", json!([2, 3]);
+    case_all_pred_false: "$.all($ > 1)", json!([2, 1]);
+    case_distinct_sel_method: "$.distinct($[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
+    case_distinct_sel_fn: "distinct($, $[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
+    case_index_where: "[1, 2, 3, 2, 1].indexWhere($ = 2)", Value::Null;
+    case_index_where_22: "[1, 2, 3, 2, 1].indexWhere($ = 22)", Value::Null;
+    case_last_index_where: "[1, 2, 3, 2, 1].lastIndexWhere($ = 2)", Value::Null;
+    case_last_index_where_22: "[1, 2, 3, 2, 1].lastIndexWhere($ = 22)", Value::Null;
+    case_aggregate: "[a,a,b,a,a].aggregate($1 + $2)", Value::Null;
+    case_reduce: "[a,a,b,a,a].reduce($1 + $2)", Value::Null;
+    case_accumulate: "[a,a,b,a,a].accumulate($1 + $2)", Value::Null;
+    case_to_dict: "$.toDict($, $*$)", json!([1, 2, 3]);
+    case_select_many: "range(4).selectMany(range($))", Value::Null;
+    case_concat_method: "$.select($).concat($.select(2 * $))", json!([1, 2, 3]);
+    case_concat_fn: "concat($, $.select(2 * $), $)", json!([1, 2, 3]);
+    case_keyword_access: "$.a", json!([{"a": 2}, {"a": 4}]);
+    case_keyword_access_select: "$.select($).a", json!([{"a": 2}, {"a": 4}]);
+    case_contains_select: "$.values().select(2*$).contains(24)", json!({"a": 12, "b": 44});
+    case_in_select: "24 in $.values().select(2*$)", json!({"a": 12, "b": 44});
+    case_first_select: "list(2, 3).select($ * 2).first()", Value::Null;
+    case_last_select: "list(2, 3).select($ * 2).last()", Value::Null;
+    case_reverse: "range(1, 4).select($*$).reverse()", Value::Null;
+    case_join_seq: "[text, 1, null, true].select(str($)).join('-')", Value::Null;
+    case_random: "with(random()) -> $ >= 0 and $ < 1", Value::Null;
+    case_random_range: "with(random(2, 5)) -> $ >= 2 and $ <= 5", Value::Null;
+    case_generate_many: "generateMany(John, $data.get($, []), decycle => true)", json!({"John": ["Jim"], "Jim": ["Jay", "Jax"], "Jax": ["John", "Jacob", "Jonathan"], "Jacob": ["Jonathan", "Jenifer"]});
+    case_generate_many_dfs: "generateMany(John, $data.get($, []), decycle => true, depthFirst => true)", json!({"John": ["Jim"], "Jim": ["Jay", "Jax"], "Jax": ["John", "Jacob", "Jonathan"], "Jacob": ["Jonathan", "Jenifer"]});
+    case_div_neg: "7 / -2", Value::Null;
+    case_mul_float_neg: "3.1 * -2.1", Value::Null;
+    case_unary_double_minus: "3--1", Value::Null;
+    case_unary_float: "3.2 - -1.1", Value::Null;
+    case_unary_paren: "-(1-3)", Value::Null;
+    case_unary_plus_4: "+4", Value::Null;
+    case_unary_plus_12f: "+12.0", Value::Null;
+    case_unary_minus_plus: "3+-1", Value::Null;
+    case_unary_plus_sub: "3-+1", Value::Null;
+    case_unary_plus_plus: "3++1", Value::Null;
+    case_unary_plus_float: "3.2 - +1.1", Value::Null;
+
+    // ========================================================================= //
+    // Lambda: aggregate/reduce/accumulate init, generate, groupBy, join,
+    // zip/zipLongest, splitWhere/sliceWhere, regex selectors/replaceBy,
+    // selectMany scalar
+    // ========================================================================= //
+    case_aggregate_init: "[].aggregate($1 + $2, 1)", Value::Null;
+    case_reduce_init: "[].reduce(max($1, $2), 0)", Value::Null;
+    case_accumulate_init: "[].accumulate($1 + $2, 1)", Value::Null;
+    case_generate: "generate(0, $ < 10, $ + 2)", Value::Null;
+    case_generate_proj: "generate(0, $ < 10, $ + 2, $ * $)", Value::Null;
+    case_group_by: "$.items().orderBy($[0]).groupBy($[1])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
+    case_group_by_sel: "$.items().orderBy($[0]).groupBy($[1], $[0])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
+    case_group_by_agg: "$.items().orderBy($[0]).groupBy($[1], $[0], $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
+    case_join_self: "$.join($, $1 > $2, [$1, $2])", json!([1, 2, 3, 4]);
+    case_zip_2: "[1, 2, 3].zip([4, 5])", Value::Null;
+    case_zip_3: "[1, 2, 3].zip([4, 5], [6, 7, 8])", Value::Null;
+    case_zip_longest_2: "[1, 2, 3].zipLongest([4, 5])", Value::Null;
+    case_zip_longest_3: "[1, 2, 3].zipLongest([4, 5], [6])", Value::Null;
+    case_zip_longest_default: "[1, 2, 3].zipLongest([4, 5], default => 0)", Value::Null;
+    case_split_where: "range(1, 6).splitWhere($ mod 3 = 1)", Value::Null;
+    case_slice_where: "[a,a,b,a,a].sliceWhere($ != a)", Value::Null;
+    case_select_many_scalar: "range(2).selectMany(xx)", Value::Null;
+    case_regex_search_sel: "regex(`(\\d+)\\.?(\\d+)?`).search('aa24.16bb', $.value + ' = ' + $2.value + '(' + str($2.start) + '-' + str($2.end) + ') + ' + $3.value + '(' + str($3.start) + '-' + str($3.end) + ')')", Value::Null;
+    case_regex_search_all_sel: "regex(`\\d+`).searchAll('a24.16b', $.value+'!')", Value::Null;
+    case_regex_replace_by: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy))", Value::Null;
+    case_regex_replace_by_count: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy), 1)", Value::Null;
+    case_regex_replace_by_on_str: "a12b23.replaceBy(regex(`\\d+`), with(int($.value)) -> switch($ < 20 => xx, true => yy))", Value::Null;
+
+    // ========================================================================= //
+    // Lambda: join cross, memorize, mergeWith (default/func/levels)
+    // ========================================================================= //
+    case_join_cross: "[1,2].join([3, 4], true, [$1, $2])", Value::Null;
+    case_memorize: "let($.memorize()) -> $.len() + $.sum()", json!([0, 1, 2]);
+    case_merge_with: "$.d1.mergeWith($.d2)", json!({"d1": {"a": 1, "b": "x", "c": [1, 2], "x": {"a": 1}}, "d2": {"d": 5, "b": "y", "c": [2, 3], "x": {"b": 2}}});
+    case_merge_with_func: "$.d1.mergeWith($.d2, $1 + $2)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
+    case_merge_with_levels: "$.d1.mergeWith($.d2, $1 + $2, maxLevels => 1)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
+
+    // ========================================================================= //
+    // groupBy with kwarg aggregator and empty positional arg
+    // ========================================================================= //
+    case_group_by_agg_kw: "$.items().orderBy($[0]).groupBy($[1], aggregator => $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
+    case_group_by_agg_no_sel: "$.items().orderBy($[0]).groupBy($[1],,  $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
 }
 
 ignored_compliance_cases! {
     // Leading-dash expressions rejected by reference CLI (optparse)
     case_ignored_unary_minus_4: "-4", Value::Null;
     case_ignored_unary_minus_12f: "-12.0", Value::Null;
-    case_ignored_unary_plus_4: "+4", Value::Null;
     case_ignored_mul_neg_neg: "-3 * -2", Value::Null;
-    case_ignored_div_neg: "7 / -2", Value::Null;
     case_ignored_div_float_neg: "-5.0 / 2.0", Value::Null;
-    case_ignored_mul_float_neg: "3.1 * -2.1", Value::Null;
     case_ignored_mul_float_neg_neg: "-3.1 * -2.1", Value::Null;
-    case_ignored_unary_double_minus: "3--1", Value::Null;
-    case_ignored_unary_minus_plus: "3+-1", Value::Null;
-    case_ignored_unary_float: "3.2 - -1.1", Value::Null;
-    case_ignored_unary_paren: "-(1-3)", Value::Null;
-    case_ignored_unary_plus_12f: "+12.0", Value::Null;
-    case_ignored_unary_plus_sub: "3-+1", Value::Null;
-    case_ignored_unary_plus_plus: "3++1", Value::Null;
-    case_ignored_unary_plus_float: "3.2 - +1.1", Value::Null;
 
     // test_math.py — random needs let/with
-    case_ignored_random: "with(random()) -> $ >= 0 and $ < 1", Value::Null;
-    case_ignored_random_range: "with(random(2, 5)) -> $ >= 2 and $ <= 5", Value::Null;
 
     // test_strings.py — split, join, norm, replace, trim, substring, indexOf, characters
-    case_ignored_join_seq: "[text, 1, null, true].select(str($)).join('-')", Value::Null;
     case_ignored_characters: "characters(octdigits => true, digits => true)", Value::Null;
 
     // test_collections.py — unimplemented features
-    case_ignored_to_dict: "$.toDict($, $*$)", json!([1, 2, 3]);
     case_ignored_dict_list_key: "dict($ => 3).get($)", json!([1, 2]);
     case_ignored_dict_list_key_nested: "dict($ => 3).get($)", json!([1, [2]]);
     case_ignored_dict_dict_key: "dict($ => 3).get($)", json!({"a": 1});
     case_ignored_dict_eq_list_key_diff: "{[c, 55] => a} = {[c, 56] => a}", Value::Null;
     case_ignored_dict_neq_list_key_diff: "{[c, 55] => a} != {[c, 56] => a}", Value::Null;
-    case_ignored_contains_select: "$.values().select(2*$).contains(24)", json!({"a": 12, "b": 44});
-    case_ignored_in_select: "24 in $.values().select(2*$)", json!({"a": 12, "b": 44});
 
     // test_queries.py — lambda queries not yet implemented
-    case_ignored_where: "$.where($ > 3)", json!([1, 2, 3, 4, 5, 6]);
-    case_ignored_select: "$.select($ * $)", json!([1, 2, 3]);
-    case_ignored_keyword_access: "$.a", json!([{"a": 2}, {"a": 4}]);
-    case_ignored_keyword_access_select: "$.select($).a", json!([{"a": 2}, {"a": 4}]);
-    case_ignored_complex_query: "$.where($ < 4).select($ * $).skip(1).limit(1)", json!([1, 2, 3, 4, 5, 6]);
-    case_ignored_all_pred_false: "$.all($ > 1)", json!([2, 1]);
-    case_ignored_all_pred: "$.all($ > 1)", json!([2, 3]);
-    case_ignored_order_by: "$.orderBy($)", json!([4, 2, 1, 3]);
-    case_ignored_order_by_desc: "$.orderByDescending($)", json!([4, 2, 1, 3]);
-    case_ignored_reverse: "range(1, 4).select($*$).reverse()", Value::Null;
-    case_ignored_first_select: "list(2, 3).select($ * 2).first()", Value::Null;
-    case_ignored_last_select: "list(2, 3).select($ * 2).last()", Value::Null;
 
     // test_queries.py — other unimplemented features
-    case_ignored_distinct_sel_method: "$.distinct($[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
-    case_ignored_distinct_sel_fn: "distinct($, $[1])", json!([["a", 1], ["b", 2], ["c", 1], ["d", 3], ["e", 2]]);
-    case_ignored_concat_method: "$.select($).concat($.select(2 * $))", json!([1, 2, 3]);
-    case_ignored_concat_fn: "concat($, $.select(2 * $), $)", json!([1, 2, 3]);
-    case_ignored_memorize: "let($.memorize()) -> $.len() + $.sum()", json!([0, 1, 2]);
-    case_ignored_select_many: "range(4).selectMany(range($))", Value::Null;
-    case_ignored_select_many_scalar: "range(2).selectMany(xx)", Value::Null;
     case_ignored_order_by_thenBy: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
     case_ignored_order_by_thenByDesc: "$.orderBy($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
     case_ignored_order_desc_thenBy: "$.orderByDescending($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
     case_ignored_order_desc_thenByDesc: "$.orderByDescending($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_ignored_group_by: "$.items().orderBy($[0]).groupBy($[1])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_group_by_sel: "$.items().orderBy($[0]).groupBy($[1], $[0])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_group_by_agg: "$.items().orderBy($[0]).groupBy($[1], $[0], $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_group_by_agg_no_sel: "$.items().orderBy($[0]).groupBy($[1],,  $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_group_by_agg_kw: "$.items().orderBy($[0]).groupBy($[1], aggregator => $.sum())", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_ignored_group_by_old: "$.items().orderBy($[0]).groupBy($[1], $[0], [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_ignored_group_by_old_no_sel: "$.items().orderBy($[0]).groupBy($[1],,  [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
     case_ignored_group_by_old_kw: "$.items().orderBy($[0]).groupBy($[1], aggregator => [$[0], $[1].sum()])", json!({"a": 1, "b": 2, "c": 1, "d": 3, "e": 2});
-    case_ignored_join_self: "$.join($, $1 > $2, [$1, $2])", json!([1, 2, 3, 4]);
-    case_ignored_join_cross: "[1,2].join([3, 4], true, [$1, $2])", Value::Null;
-    case_ignored_zip_2: "[1, 2, 3].zip([4, 5])", Value::Null;
-    case_ignored_zip_3: "[1, 2, 3].zip([4, 5], [6, 7, 8])", Value::Null;
-    case_ignored_zip_longest_2: "[1, 2, 3].zipLongest([4, 5])", Value::Null;
-    case_ignored_zip_longest_3: "[1, 2, 3].zipLongest([4, 5], [6])", Value::Null;
-    case_ignored_zip_longest_default: "[1, 2, 3].zipLongest([4, 5], default => 0)", Value::Null;
     case_ignored_repeat_2: "null.repeat(2)", Value::Null;
     case_ignored_repeat_inf: "1.repeat().limit(5)", Value::Null;
     case_ignored_cycle: "[1, 2].cycle().take(5)", Value::Null;
-    case_ignored_take_while: "[1, 2, 3, 4, 5].takeWhile($ < 4)", Value::Null;
-    case_ignored_skip_while: "[1, 2, 3, 4, 5].skipWhile($ < 4)", Value::Null;
-    case_ignored_index_where: "[1, 2, 3, 2, 1].indexWhere($ = 2)", Value::Null;
-    case_ignored_index_where_22: "[1, 2, 3, 2, 1].indexWhere($ = 22)", Value::Null;
-    case_ignored_last_index_where: "[1, 2, 3, 2, 1].lastIndexWhere($ = 2)", Value::Null;
-    case_ignored_last_index_where_22: "[1, 2, 3, 2, 1].lastIndexWhere($ = 22)", Value::Null;
-    case_ignored_split_where: "range(1, 6).splitWhere($ mod 3 = 1)", Value::Null;
-    case_ignored_slice_where: "[a,a,b,a,a].sliceWhere($ != a)", Value::Null;
-    case_ignored_aggregate: "[a,a,b,a,a].aggregate($1 + $2)", Value::Null;
-    case_ignored_aggregate_init: "[].aggregate($1 + $2, 1)", Value::Null;
-    case_ignored_reduce: "[a,a,b,a,a].reduce($1 + $2)", Value::Null;
-    case_ignored_reduce_init: "[].reduce(max($1, $2), 0)", Value::Null;
-    case_ignored_accumulate: "[a,a,b,a,a].accumulate($1 + $2)", Value::Null;
-    case_ignored_accumulate_init: "[].accumulate($1 + $2, 1)", Value::Null;
-    case_ignored_generate: "generate(0, $ < 10, $ + 2)", Value::Null;
-    case_ignored_generate_proj: "generate(0, $ < 10, $ + 2, $ * $)", Value::Null;
-    case_ignored_generate_many: "generateMany(John, $data.get($, []), decycle => true)", json!({"John": ["Jim"], "Jim": ["Jay", "Jax"], "Jax": ["John", "Jacob", "Jonathan"], "Jacob": ["Jonathan", "Jenifer"]});
-    case_ignored_generate_many_dfs: "generateMany(John, $data.get($, []), decycle => true, depthFirst => true)", json!({"John": ["Jim"], "Jim": ["Jay", "Jax"], "Jax": ["John", "Jacob", "Jonathan"], "Jacob": ["Jonathan", "Jenifer"]});
-    case_ignored_merge_with: "$.d1.mergeWith($.d2)", json!({"d1": {"a": 1, "b": "x", "c": [1, 2], "x": {"a": 1}}, "d2": {"d": 5, "b": "y", "c": [2, 3], "x": {"b": 2}}});
-    case_ignored_merge_with_func: "$.d1.mergeWith($.d2, $1 + $2)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
-    case_ignored_merge_with_levels: "$.d1.mergeWith($.d2, $1 + $2, maxLevels => 1)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
     case_ignored_merge_with_min: "$.d1.mergeWith($.d2,, min($1, $2))", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
 
     // test_regex.py — regex support (lambda-dependent cases stay ignored)
-    case_ignored_regex_search_sel: "regex(`(\\d+)\\.?(\\d+)?`).search('aa24.16bb', $.value + ' = ' + $2.value + '(' + str($2.start) + '-' + str($2.end) + ') + ' + $3.value + '(' + str($3.start) + '-' + str($3.end) + ')')", Value::Null;
-    case_ignored_regex_search_all_sel: "regex(`\\d+`).searchAll('a24.16b', $.value+'!')", Value::Null;
-    case_ignored_regex_replace_by: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy))", Value::Null;
-    case_ignored_regex_replace_by_count: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy), 1)", Value::Null;
-    case_ignored_regex_replace_by_on_str: "a12b23.replaceBy(regex(`\\d+`), with(int($.value)) -> switch($ < 20 => xx, true => yy))", Value::Null;
 }

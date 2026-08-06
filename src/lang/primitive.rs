@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use regex::Regex;
+use crate::ast::Value;
 
 #[derive(Clone, Debug)]
 pub struct RegexWrapper(pub Arc<Regex>, pub bool);
@@ -18,6 +19,12 @@ impl PartialEq for RegexWrapper {
 }
 
 #[derive(Clone, Debug)]
+pub struct LambdaBody {
+    pub body: Box<Value>,
+    pub env: Vec<Primitive>,
+}
+
+#[derive(Clone, Debug)]
 pub enum Primitive {
     String(String),
     Int(i64),
@@ -27,6 +34,7 @@ pub enum Primitive {
     Set(Vec<Primitive>),
     Map(HashMap<String, Primitive>),
     Regex(RegexWrapper),
+    Lambda(LambdaBody),
     Null,
 }
 
@@ -40,6 +48,7 @@ pub fn truthy(value: &Primitive) -> bool {
         Primitive::Set(v) => v.len() > 0,
         Primitive::Map(m) => m.len() > 0,
         Primitive::Regex(_) => true,
+        Primitive::Lambda(_) => true,
         Primitive::Null => false,
     }
 }
@@ -114,5 +123,6 @@ pub fn type_rank(p: &Primitive) -> u8 {
         Primitive::Set(_) => 4,
         Primitive::Map(_) => 5,
         Primitive::Regex(_) => 6,
+        Primitive::Lambda(_) => 7,
     }
 }
