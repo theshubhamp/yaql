@@ -74,13 +74,6 @@ fn parse_args() -> Args {
                 out.data = Some(s[2..].to_string());
             }
             s if s.starts_with('-') && s != "-" => {
-                let second = s.chars().nth(1).unwrap();
-                if !second.is_ascii_alphabetic() {
-                    if out.expr.is_none() {
-                        out.expr = Some(arg);
-                    }
-                    continue;
-                }
                 eprintln!("error: unknown option: {}", s);
                 eprintln!("\n{}", HELP);
                 exit(2);
