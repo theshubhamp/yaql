@@ -2,7 +2,7 @@ use crate::lang::primitive::Primitive;
 use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Spec, ArgSpec, Type, RegexWrapper};
 use crate::yaql_function;
 use crate::yaql_raw_function;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 fn build_regex(pattern: &str, ignore_case: bool) -> Option<RegexWrapper> {
     let mut builder = RegexBuilder::new(pattern);
@@ -215,9 +215,68 @@ pub fn str_replace_by_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Pr
 }
 yaql_raw_function!("replaceBy", str_replace_by_regex_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::String], false);
 
-// --- Helpers ---
+// --- replaceBy (lambda: replacement is a lambda called with match object) ---
+pub fn regex_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let Primitive::Lambda(lambda) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let mut result = String::new();
+    let mut last_end = 0;
+    let mut matched = 0;
+    for cap in re.0.captures_iter(s) {
+        if let Some(c) = count { if matched >= c { break; } }
+        let m = cap.get(0).unwrap();
+        result.push_str(&s[last_end..m.start()]);
+        let match_obj = match_to_map(&m, s);
+        let groups: Vec<Primitive> = (0..cap.len()).map(|i| {
+            cap.get(i).map(|g| match_to_map(&g, s)).unwrap_or(Primitive::Null)
+        }).collect();
+        let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
+        interp.push_context(Primitive::Array(groups));
+        interp.push_context(match_obj);
+        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
+        if let Primitive::String(r) = replacement { result.push_str(&r); }
+        last_end = m.end();
+        matched += 1;
+    }
+    result.push_str(&s[last_end..]);
+    Primitive::String(result)
+}
+yaql_raw_function!("replaceBy", regex_replace_by_lambda_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::Lambda], false);
 
-use regex::RegexBuilder;
+pub fn str_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
+    let Primitive::Lambda(lambda) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let mut result = String::new();
+    let mut last_end = 0;
+    let mut matched = 0;
+    for cap in re.0.captures_iter(s) {
+        if let Some(c) = count { if matched >= c { break; } }
+        let m = cap.get(0).unwrap();
+        result.push_str(&s[last_end..m.start()]);
+        let match_obj = match_to_map(&m, s);
+        let groups: Vec<Primitive> = (0..cap.len()).map(|i| {
+            cap.get(i).map(|g| match_to_map(&g, s)).unwrap_or(Primitive::Null)
+        }).collect();
+        let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
+        interp.push_context(Primitive::Array(groups));
+        interp.push_context(match_obj);
+        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
+        if let Primitive::String(r) = replacement { result.push_str(&r); }
+        last_end = m.end();
+        matched += 1;
+    }
+    result.push_str(&s[last_end..]);
+    Primitive::String(result)
+}
+yaql_raw_function!("replaceBy", str_replace_by_lambda_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::Lambda], false);
 
 fn match_to_map(m: &regex::Match, s: &str) -> Primitive {
     let mut map = std::collections::HashMap::new();
@@ -235,47 +294,23 @@ fn capture_to_map(cap: &regex::Captures, idx: usize, s: &str) -> Primitive {
 }
 
 fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&regex::Captures>, s: &str) -> Primitive {
-    match selector {
-        // $ alone → full match object (value/start/end dict)
-        Primitive::String(path) if path.is_empty() => {
-            match_to_map(m, s)
-        }
-        // $N → capture group N's match object
-        Primitive::String(path) if path.chars().all(|c| c.is_ascii_digit()) && !path.is_empty() => {
-            let n: usize = path.parse().unwrap_or(0);
-            match captures {
-                Some(cap) if n <= cap.len() => {
-                    if n == 0 {
-                        match_to_map(m, s)
-                    } else {
-                        capture_to_map(cap, n, s)
-                    }
-                }
-                _ => Primitive::Null,
-            }
-        }
-        // $.field → access field on the full match object
-        Primitive::Map(_) => {
-            let mobj = match_to_map(m, s);
-            if let Primitive::Map(selector_map) = selector {
-                // If it's a dict, try to apply as a template — but for now just return $ value
-                let _ = selector_map;
-            }
-            mobj
-        }
-        // $.value, $.start, $.end — represented as BinaryOperator(".", $, "value") which
-        // gets evaluated to dot_access($, "value"). But by the time we get here, the selector
-        // is already a Primitive. So this path is unreachable without lambda support.
-        // Just return the full match value for any string selector.
-        Primitive::String(other) => {
-            // Could be $.value already evaluated to a string — just return match value
-            if other == "value" {
-                return Primitive::String(m.as_str().to_string());
-            }
-            Primitive::String(m.as_str().to_string())
-        }
-        _ => Primitive::String(m.as_str().to_string()),
+    use crate::interpreter::Interpreter;
+    let Primitive::Lambda(lambda) = selector else {
+        return Primitive::String(m.as_str().to_string());
+    };
+    // Build context: push match object as $, and capture groups array for $1/$2
+    let match_obj = match_to_map(m, s);
+    let mut interp = Interpreter { contexts: lambda.env.clone(), current_func: None };
+    // For $1/$2: push array of capture group objects
+    if let Some(cap) = captures {
+        let groups: Vec<Primitive> = (0..cap.len()).map(|i| {
+            cap.get(i).map(|g| match_to_map(&g, s)).unwrap_or(Primitive::Null)
+        }).collect();
+        interp.push_context(Primitive::Array(groups));
     }
+    // Push match object as $ (top of stack)
+    interp.push_context(match_obj);
+    crate::interpreter::eval_body(&mut interp, &lambda.body)
 }
 
 fn apply_backrefs(re: &Regex, s: &str, replacement: &str, count: Option<usize>) -> String {

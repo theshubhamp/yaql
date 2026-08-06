@@ -15,6 +15,7 @@ pub enum Type {
     Set,
     Map,
     Regex,
+    Lambda,
     Null,
     Any,
 }
@@ -31,6 +32,7 @@ impl Type {
             (Type::Set, Primitive::Set(_)) => true,
             (Type::Map, Primitive::Map(_)) => true,
             (Type::Regex, Primitive::Regex(_)) => true,
+            (Type::Lambda, Primitive::Lambda(_)) => true,
             (Type::Null, Primitive::Null) => true,
             (Type::Any, _) => true,
             _ => false,

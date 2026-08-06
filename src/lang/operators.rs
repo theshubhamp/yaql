@@ -188,6 +188,9 @@ pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
 pub fn dot_access(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().unwrap_or(Primitive::Null),
+        (Primitive::Array(arr), Primitive::String(key)) => {
+            Primitive::Array(arr.iter().map(|e| dot_access(e.clone(), right.clone())).collect())
+        }
         _ => Primitive::Null,
     }
 }

@@ -90,14 +90,19 @@ impl<'input> Parser<'input> {
     fn parse_or(&mut self) -> Result<Value, ParseError> {
         let mut left = self.parse_and()?;
         loop {
-            let op = match self.peek_tok()? {
-                Some(Tok::Or) => "or",
-                Some(Tok::Arrow) => "->",
+            match self.peek_tok()? {
+                Some(Tok::Or) => {
+                    self.advance()?;
+                    let right = self.parse_and()?;
+                    left = Value::BinaryOperator(Box::new(left), "or".to_string(), Box::new(right));
+                }
+                Some(Tok::Arrow) => {
+                    self.advance()?;
+                    let right = self.parse_or()?;
+                    left = Value::Lambda(Box::new(left), Box::new(right));
+                }
                 _ => break,
-            };
-            self.advance()?;
-            let right = self.parse_and()?;
-            left = Value::BinaryOperator(Box::new(left), op.to_string(), Box::new(right));
+            }
         }
         Ok(left)
     }
@@ -350,15 +355,19 @@ impl<'input> Parser<'input> {
         let mut kwargs = Vec::new();
         if self.is_closing()? { return Ok((args, kwargs)); }
 
-        // Parse first item — could be arg or kwarg
-        let first = self.parse_value()?;
-        match self.peek_tok()? {
-            Some(Tok::MappingArrow) => {
-                self.advance()?;
-                let val = self.parse_value()?;
-                kwargs.push((first, val));
+        // Parse first item — could be arg, kwarg, or empty (,,)
+        if let Some(Tok::Comma) = self.peek_tok()? {
+            args.push(Value::NullLiteral);
+        } else {
+            let first = self.parse_value()?;
+            match self.peek_tok()? {
+                Some(Tok::MappingArrow) => {
+                    self.advance()?;
+                    let val = self.parse_value()?;
+                    kwargs.push((first, val));
+                }
+                _ => { args.push(first); }
             }
-            _ => { args.push(first); }
         }
 
         loop {
@@ -366,6 +375,11 @@ impl<'input> Parser<'input> {
                 Some(Tok::Comma) => {
                     self.advance()?;
                     if self.is_closing()? { break; }
+                    // Handle empty arg (,,)
+                    if let Some(Tok::Comma) = self.peek_tok()? {
+                        args.push(Value::NullLiteral);
+                        continue;
+                    }
                     let key_or_arg = self.parse_value()?;
                     match self.peek_tok()? {
                         Some(Tok::MappingArrow) => {
