@@ -642,6 +642,38 @@ compliance_cases! {
     case_switch_case_3: "$.switchCase('a', 'b', 'c')", json!(3);
     case_switch_case_30: "$.switchCase('a', 'b', 'c')", json!(30);
     case_switch_case_neg30: "$.switchCase('a', 'b', 'c')", json!(-30);
+
+    // ========================================================================= //
+    // test_regex.py
+    // ========================================================================= //
+    case_regex_matches: "regex('a.b').matches(axb)", Value::Null;
+    case_regex_matches_false: "regex('a.b').matches(abx)", Value::Null;
+    case_regex_method_matches: "axb.matches('a.b')", Value::Null;
+    case_regex_method_matches_false: "abx.matches('a.b')", Value::Null;
+    case_regex_op_match: "axb =~ regex('a.b')", Value::Null;
+    case_regex_op_match_false: "abx =~ regex('a.b')", Value::Null;
+    case_regex_op_not_match: "axb !~ regex('a.b')", Value::Null;
+    case_regex_op_not_match_true: "abx !~ regex('a.b')", Value::Null;
+    case_regex_op_str_match: "axb =~ 'a.b'", Value::Null;
+    case_regex_op_str_match_false: "abx =~ 'a.b'", Value::Null;
+    case_regex_op_str_not_match: "axb !~ 'a.b'", Value::Null;
+    case_regex_op_str_not_match_true: "abx !~ 'a.b'", Value::Null;
+    case_regex_search: "regex(`(\\d+)\\.?(\\d+)?`).search('a24.16b')", Value::Null;
+    case_regex_search_all: "regex(`\\d+`).searchAll('a24.16b')", Value::Null;
+    case_regex_split: "regex(`\\W+`).split('Words, words, words.')", Value::Null;
+    case_regex_split_cap: "regex(`(\\W+)`).split('Words, words, words.')", Value::Null;
+    case_regex_split_max: "regex(`\\W+`).split('Words, words, words.', 1)", Value::Null;
+    case_regex_split_icase: "regex('[a-f]+', ignoreCase => true).split('0a3B9')", Value::Null;
+    case_regex_split_on_str: "'Words, words, words.'.split(regex(`\\W+`))", Value::Null;
+    case_regex_replace: "regex(`\\d+`).replace(a12b23, xx)", Value::Null;
+    case_regex_replace_count: "regex(`\\d+`).replace(a12b23, xx, 1)", Value::Null;
+    case_regex_replace_backref: "regex(`([a-z0-9])([A-Z])`).replace(FooBarFoo, `\\1_\\2`)", Value::Null;
+    case_regex_replace_on_str: "a12b23.replace(regex(`\\d+`), xx)", Value::Null;
+    case_regex_replace_on_str_count: "a12b23.replace(regex(`\\d+`), xx, 1)", Value::Null;
+    case_regex_escape: "escapeRegex('[')", Value::Null;
+    case_is_regex_true: "isRegex(regex(\"a.b\"))", Value::Null;
+    case_is_regex_123: "isRegex(123)", Value::Null;
+    case_is_regex_abc: "isRegex(abc)", Value::Null;
 }
 
 ignored_compliance_cases! {
@@ -770,38 +802,10 @@ ignored_compliance_cases! {
     case_ignored_merge_with_levels: "$.d1.mergeWith($.d2, $1 + $2, maxLevels => 1)", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
     case_ignored_merge_with_min: "$.d1.mergeWith($.d2,, min($1, $2))", json!({"d1": {"a": 1, "b": 2, "c": [1, 2]}, "d2": {"d": 5, "b": 3, "c": [2, 3]}});
 
-    // test_regex.py — regex not yet implemented
-    case_ignored_regex_matches: "regex('a.b').matches(axb)", Value::Null;
-    case_ignored_regex_matches_false: "regex('a.b').matches(abx)", Value::Null;
-    case_ignored_regex_method_matches: "axb.matches('a.b')", Value::Null;
-    case_ignored_regex_method_matches_false: "abx.matches('a.b')", Value::Null;
-    case_ignored_regex_op_match: "axb =~ regex('a.b')", Value::Null;
-    case_ignored_regex_op_match_false: "abx =~ regex('a.b')", Value::Null;
-    case_ignored_regex_op_not_match: "axb !~ regex('a.b')", Value::Null;
-    case_ignored_regex_op_not_match_true: "abx !~ regex('a.b')", Value::Null;
-    case_ignored_regex_op_str_match: "axb =~ 'a.b'", Value::Null;
-    case_ignored_regex_op_str_match_false: "abx =~ 'a.b'", Value::Null;
-    case_ignored_regex_op_str_not_match: "axb !~ 'a.b'", Value::Null;
-    case_ignored_regex_op_str_not_match_true: "abx !~ 'a.b'", Value::Null;
-    case_ignored_regex_search: "regex(`(\\d+)\\.?(\\d+)?`).search('a24.16b')", Value::Null;
+    // test_regex.py — regex support (lambda-dependent cases stay ignored)
     case_ignored_regex_search_sel: "regex(`(\\d+)\\.?(\\d+)?`).search('aa24.16bb', $.value + ' = ' + $2.value + '(' + str($2.start) + '-' + str($2.end) + ') + ' + $3.value + '(' + str($3.start) + '-' + str($3.end) + ')')", Value::Null;
-    case_ignored_regex_search_all: "regex(`\\d+`).searchAll('a24.16b')", Value::Null;
     case_ignored_regex_search_all_sel: "regex(`\\d+`).searchAll('a24.16b', $.value+'!')", Value::Null;
-    case_ignored_regex_split: "regex(`\\W+`).split('Words, words, words.')", Value::Null;
-    case_ignored_regex_split_cap: "regex(`(\\W+)`).split('Words, words, words.')", Value::Null;
-    case_ignored_regex_split_max: "regex(`\\W+`).split('Words, words, words.', 1)", Value::Null;
-    case_ignored_regex_split_icase: "regex('[a-f]+', ignoreCase => true).split('0a3B9')", Value::Null;
-    case_ignored_regex_split_on_str: "'Words, words, words.'.split(regex(`\\W+`))", Value::Null;
-    case_ignored_regex_replace: "regex(`\\d+`).replace(a12b23, xx)", Value::Null;
-    case_ignored_regex_replace_count: "regex(`\\d+`).replace(a12b23, xx, 1)", Value::Null;
-    case_ignored_regex_replace_backref: "regex(`([a-z0-9])([A-Z])`).replace(FooBarFoo, `\\1_\\2`)", Value::Null;
-    case_ignored_regex_replace_on_str: "a12b23.replace(regex(`\\d+`), xx)", Value::Null;
-    case_ignored_regex_replace_on_str_count: "a12b23.replace(regex(`\\d+`), xx, 1)", Value::Null;
     case_ignored_regex_replace_by: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy))", Value::Null;
     case_ignored_regex_replace_by_count: "regex(`\\d+`).replaceBy(a12b23, let(a => int($.value)) -> switch($a < 20 => xx, true => yy), 1)", Value::Null;
     case_ignored_regex_replace_by_on_str: "a12b23.replaceBy(regex(`\\d+`), with(int($.value)) -> switch($ < 20 => xx, true => yy))", Value::Null;
-    case_ignored_regex_escape: "escapeRegex('[')", Value::Null;
-    case_ignored_is_regex_true: "isRegex(regex(\"a.b\"))", Value::Null;
-    case_ignored_is_regex_123: "isRegex(123)", Value::Null;
-    case_ignored_is_regex_abc: "isRegex(abc)", Value::Null;
 }

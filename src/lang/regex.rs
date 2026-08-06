@@ -1,0 +1,391 @@
+use crate::lang::primitive::Primitive;
+use crate::lang::functions::{FromPrimitive, IntoPrimitive, Any, Spec, ArgSpec, Type, RegexWrapper};
+use crate::yaql_function;
+use crate::yaql_raw_function;
+use regex::Regex;
+
+fn build_regex(pattern: &str, ignore_case: bool) -> Option<RegexWrapper> {
+    let mut builder = RegexBuilder::new(pattern);
+    if ignore_case {
+        builder.case_insensitive(true);
+    }
+    builder.build().ok().map(|re| RegexWrapper::new(re, ignore_case))
+}
+
+// regex(pattern) and regex(pattern, ignoreCase => bool)
+pub fn regex_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(pattern) = &args[0] else { return Primitive::Null };
+    let ignore_case = kwargs.iter().find_map(|(k, v)| {
+        if let Primitive::String(key) = k {
+            if key == "ignoreCase" {
+                if let Primitive::Boolean(b) = v { return Some(*b); }
+            }
+        }
+        None
+    }).unwrap_or(false);
+    match build_regex(pattern, ignore_case) {
+        Some(r) => Primitive::Regex(r),
+        None => Primitive::Null,
+    }
+}
+yaql_raw_function!("regex", regex_fn, ArgSpec::Min(1), [Type::String], true);
+
+// escapeRegex(s)
+yaql_function!("escapeRegex", escape_regex(s: String) -> String {
+    regex::escape(&s)
+});
+
+// isRegex(x)
+yaql_function!("isRegex", is_regex(v: Any) -> bool {
+    matches!(v.0, Primitive::Regex(_))
+});
+
+// --- matches ---
+// regex.matches(string) -> bool (partial match / search)
+yaql_function!("matches", regex_matches(re: RegexWrapper, s: String) -> bool {
+    re.0.is_match(&s)
+});
+
+// string.matches(string) -> bool (full match via anchoring)
+pub fn str_matches_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+    let Primitive::String(pattern) = &args[1] else { return Primitive::Null };
+    let anchored = format!("^(?:{})$", pattern);
+    match Regex::new(&anchored) {
+        Ok(re) => Primitive::Boolean(re.is_match(&s)),
+        Err(_) => Primitive::Null,
+    }
+}
+yaql_raw_function!("matches", str_matches_fn, ArgSpec::Exact(2), [Type::String, Type::String], false);
+
+// --- =~ operator (partial match) ---
+// string =~ regex  OR  string =~ string
+pub fn match_op(left: Primitive, right: Primitive) -> Primitive {
+    let Primitive::String(s) = &left else { return Primitive::Null };
+    let re: Regex = match &right {
+        Primitive::Regex(r) => (*r.0).clone(),
+        Primitive::String(p) => match Regex::new(p) {
+            Ok(r) => r,
+            Err(_) => return Primitive::Null,
+        },
+        _ => return Primitive::Null,
+    };
+    Primitive::Boolean(re.is_match(&s))
+}
+
+// string !~ regex  OR  string !~ string
+pub fn not_match_op(left: Primitive, right: Primitive) -> Primitive {
+    let Primitive::Boolean(b) = match_op(left, right) else { return Primitive::Null };
+    Primitive::Boolean(!b)
+}
+
+// --- search ---
+// regex.search(string) -> string | null  (first full match value)
+// regex.search(string, selector) -> selector applied to match object
+pub fn regex_search_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let m = match re.0.find(&s) {
+        Some(m) => m,
+        None => return Primitive::Null,
+    };
+    let captures = re.0.captures(&s);
+    if args.len() == 2 {
+        return Primitive::String(m.as_str().to_string());
+    }
+    // With selector — but we don't have lambda support, so only handle $ / $N / $.field
+    let selector = &args[2];
+    apply_selector(selector, &m, captures.as_ref(), s)
+}
+yaql_raw_function!("search", regex_search_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
+
+// --- searchAll ---
+// regex.searchAll(string) -> array of strings
+// regex.searchAll(string, selector) -> array of selector results
+pub fn regex_search_all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let has_selector = args.len() > 2;
+    let mut results = Vec::new();
+    for m in re.0.find_iter(&s) {
+        if !has_selector {
+            results.push(Primitive::String(m.as_str().to_string()));
+            continue;
+        }
+        let captures = re.0.captures_at(&s, m.start());
+        let r = apply_selector(&args[2], &m, captures.as_ref(), s);
+        results.push(r);
+    }
+    Primitive::Array(results)
+}
+yaql_raw_function!("searchAll", regex_search_all_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
+
+// --- split ---
+// regex.split(string) -> array
+// regex.split(string, maxsplit) -> array
+pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let maxsplit = if args.len() > 2 {
+        if let Primitive::Int(n) = &args[2] { Some(*n as usize) } else { None }
+    } else { None };
+    let parts: Vec<Primitive> = if let Some(n) = maxsplit {
+        // Python's re.split with maxsplit: split at most n times → n+1 pieces
+        split_with_max(&re.0, s, n)
+    } else {
+        re.0.split(&s).map(|p| Primitive::String(p.to_string())).collect()
+    };
+    // If pattern has capture groups, Python inserts captured groups between splits
+    if re.0.captures_len() > 1 {
+        let parts = if let Some(n) = maxsplit {
+            split_with_max_captures(&re.0, s, n)
+        } else {
+            split_captures(&re.0, s)
+        };
+        return Primitive::Array(parts);
+    }
+    Primitive::Array(parts)
+}
+yaql_raw_function!("split", regex_split_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
+
+// string.split(regex) -> array
+pub fn str_split_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
+    if re.0.captures_len() > 1 {
+        return Primitive::Array(split_captures(&re.0, s));
+    }
+    Primitive::Array(re.0.split(&s).map(|p| Primitive::String(p.to_string())).collect())
+}
+yaql_raw_function!("split", str_split_regex_fn, ArgSpec::Exact(2), [Type::String, Type::Regex], false);
+
+// --- replace ---
+// regex.replace(string, replacement) -> string
+// regex.replace(string, replacement, count) -> string
+pub fn regex_replace_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let result = apply_backrefs(&re.0, s, replacement, count);
+    Primitive::String(result)
+}
+yaql_raw_function!("replace", regex_replace_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::String], false);
+
+// string.replace(regex, replacement) -> string
+// string.replace(regex, replacement, count) -> string
+pub fn str_replace_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
+    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let result = apply_backrefs(&re.0, s, replacement, count);
+    Primitive::String(result)
+}
+yaql_raw_function!("replace", str_replace_regex_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::String], false);
+
+// --- replaceBy (without lambda, only string replacement) ---
+// regex.replaceBy(string, replacement) -> string
+// regex.replaceBy(string, replacement, count) -> string
+pub fn regex_replace_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
+    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let result = apply_backrefs(&re.0, s, replacement, count);
+    Primitive::String(result)
+}
+yaql_raw_function!("replaceBy", regex_replace_by_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::String], false);
+
+pub fn str_replace_by_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
+    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+    let count = if args.len() > 3 {
+        if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
+    } else { None };
+    let result = apply_backrefs(&re.0, s, replacement, count);
+    Primitive::String(result)
+}
+yaql_raw_function!("replaceBy", str_replace_by_regex_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::String], false);
+
+// --- Helpers ---
+
+use regex::RegexBuilder;
+
+fn match_to_map(m: &regex::Match, s: &str) -> Primitive {
+    let mut map = std::collections::HashMap::new();
+    map.insert("value".to_string(), Primitive::String(m.as_str().to_string()));
+    map.insert("start".to_string(), Primitive::Int(m.start() as i64));
+    map.insert("end".to_string(), Primitive::Int(m.end() as i64));
+    Primitive::Map(map)
+}
+
+fn capture_to_map(cap: &regex::Captures, idx: usize, s: &str) -> Primitive {
+    match cap.get(idx) {
+        Some(m) => match_to_map(&m, s),
+        None => Primitive::Null,
+    }
+}
+
+fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&regex::Captures>, s: &str) -> Primitive {
+    match selector {
+        // $ alone → full match object (value/start/end dict)
+        Primitive::String(path) if path.is_empty() => {
+            match_to_map(m, s)
+        }
+        // $N → capture group N's match object
+        Primitive::String(path) if path.chars().all(|c| c.is_ascii_digit()) && !path.is_empty() => {
+            let n: usize = path.parse().unwrap_or(0);
+            match captures {
+                Some(cap) if n <= cap.len() => {
+                    if n == 0 {
+                        match_to_map(m, s)
+                    } else {
+                        capture_to_map(cap, n, s)
+                    }
+                }
+                _ => Primitive::Null,
+            }
+        }
+        // $.field → access field on the full match object
+        Primitive::Map(_) => {
+            let mobj = match_to_map(m, s);
+            if let Primitive::Map(selector_map) = selector {
+                // If it's a dict, try to apply as a template — but for now just return $ value
+                let _ = selector_map;
+            }
+            mobj
+        }
+        // $.value, $.start, $.end — represented as BinaryOperator(".", $, "value") which
+        // gets evaluated to dot_access($, "value"). But by the time we get here, the selector
+        // is already a Primitive. So this path is unreachable without lambda support.
+        // Just return the full match value for any string selector.
+        Primitive::String(other) => {
+            // Could be $.value already evaluated to a string — just return match value
+            if other == "value" {
+                return Primitive::String(m.as_str().to_string());
+            }
+            Primitive::String(m.as_str().to_string())
+        }
+        _ => Primitive::String(m.as_str().to_string()),
+    }
+}
+
+fn apply_backrefs(re: &Regex, s: &str, replacement: &str, count: Option<usize>) -> String {
+    // Handle backreferences: \1, \2, ... and ${name}
+    let captures_iter: Vec<regex::Captures> = if let Some(n) = count {
+        re.captures_iter(&s).take(n).collect()
+    } else {
+        re.captures_iter(&s).collect()
+    };
+
+    if captures_iter.is_empty() {
+        return s.to_string();
+    }
+
+    let mut result = String::new();
+    let mut last_end = 0;
+    for cap in &captures_iter {
+        let m = cap.get(0).unwrap();
+        result.push_str(&s[last_end..m.start()]);
+        result.push_str(&expand_backrefs(cap, replacement));
+        last_end = m.end();
+    }
+    result.push_str(&s[last_end..]);
+    result
+}
+
+fn expand_backrefs(cap: &regex::Captures, replacement: &str) -> String {
+    let mut result = String::new();
+    let chars: Vec<char> = replacement.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '\\' && i + 1 < chars.len() {
+            let next = chars[i + 1];
+            if next.is_ascii_digit() {
+                let n: usize = next.to_digit(10).unwrap() as usize;
+                if n <= cap.len() {
+                    if let Some(m) = cap.get(n) {
+                        result.push_str(m.as_str());
+                    }
+                }
+                i += 2;
+                continue;
+            } else if next == '\\' {
+                result.push('\\');
+                i += 2;
+                continue;
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
+fn split_with_max(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
+    let mut result = Vec::new();
+    let mut last_end = 0;
+    let mut splits = 0;
+    for m in re.find_iter(&s) {
+        if splits >= maxsplit {
+            break;
+        }
+        result.push(Primitive::String(s[last_end..m.start()].to_string()));
+        last_end = m.end();
+        splits += 1;
+    }
+    result.push(Primitive::String(s[last_end..].to_string()));
+    result
+}
+
+fn split_captures(re: &Regex, s: &str) -> Vec<Primitive> {
+    let mut result = Vec::new();
+    let mut last_end = 0;
+    for cap in re.captures_iter(&s) {
+        let m = cap.get(0).unwrap();
+        result.push(Primitive::String(s[last_end..m.start()].to_string()));
+        // Insert capture groups (1..n)
+        for i in 1..cap.len() {
+            if let Some(g) = cap.get(i) {
+                result.push(Primitive::String(g.as_str().to_string()));
+            } else {
+                result.push(Primitive::Null);
+            }
+        }
+        last_end = m.end();
+    }
+    result.push(Primitive::String(s[last_end..].to_string()));
+    result
+}
+
+fn split_with_max_captures(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
+    let mut result = Vec::new();
+    let mut last_end = 0;
+    let mut splits = 0;
+    for cap in re.captures_iter(&s) {
+        if splits >= maxsplit {
+            break;
+        }
+        let m = cap.get(0).unwrap();
+        result.push(Primitive::String(s[last_end..m.start()].to_string()));
+        for i in 1..cap.len() {
+            if let Some(g) = cap.get(i) {
+                result.push(Primitive::String(g.as_str().to_string()));
+            } else {
+                result.push(Primitive::Null);
+            }
+        }
+        last_end = m.end();
+        splits += 1;
+    }
+    result.push(Primitive::String(s[last_end..].to_string()));
+    result
+}

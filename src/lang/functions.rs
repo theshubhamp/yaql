@@ -1,4 +1,5 @@
 pub use crate::lang::primitive::Primitive;
+pub use crate::lang::primitive::RegexWrapper;
 pub use std::collections::HashMap;
 
 pub type Function = fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Primitive;
@@ -13,6 +14,7 @@ pub enum Type {
     Array,
     Set,
     Map,
+    Regex,
     Null,
     Any,
 }
@@ -28,6 +30,7 @@ impl Type {
             (Type::Array, Primitive::Array(_)) => true,
             (Type::Set, Primitive::Set(_)) => true,
             (Type::Map, Primitive::Map(_)) => true,
+            (Type::Regex, Primitive::Regex(_)) => true,
             (Type::Null, Primitive::Null) => true,
             (Type::Any, _) => true,
             _ => false,
@@ -115,6 +118,13 @@ impl FromPrimitive for std::collections::HashMap<String, Primitive> {
     }
 }
 
+impl FromPrimitive for RegexWrapper {
+    const TYPE: Type = Type::Regex;
+    fn from_primitive(p: &Primitive) -> Option<Self> {
+        if let Primitive::Regex(r) = p { Some(r.clone()) } else { None }
+    }
+}
+
 impl<T: FromPrimitive> FromPrimitive for Option<T> {
     const TYPE: Type = T::TYPE;
     fn from_primitive(p: &Primitive) -> Option<Self> {
@@ -187,6 +197,10 @@ impl IntoPrimitive for Vec<Primitive> {
 
 impl IntoPrimitive for SetVec {
     fn into_primitive(self) -> Primitive { Primitive::Set(self.0) }
+}
+
+impl IntoPrimitive for RegexWrapper {
+    fn into_primitive(self) -> Primitive { Primitive::Regex(self) }
 }
 
 impl<T: IntoPrimitive> IntoPrimitive for Option<T> {

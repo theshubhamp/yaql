@@ -1,5 +1,6 @@
 use crate::lang::primitive::{Primitive, as_f64, arith, truthy, primitive_eq};
 use crate::lang::sets::{set_push_unique, is_subset, set_equal, set_difference};
+use crate::lang::regex::{match_op, not_match_op};
 
 pub fn add(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
@@ -212,6 +213,8 @@ impl BinaryOperators {
             "in" => in_op,
             "." => dot_access,
             "?." => dot_access,
+            "=~" => match_op,
+            "!~" => not_match_op,
             "=>" => |_, _| Primitive::Null,
             _ => todo!()
         }

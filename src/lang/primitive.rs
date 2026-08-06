@@ -1,4 +1,21 @@
 use std::collections::HashMap;
+use std::sync::Arc;
+use regex::Regex;
+
+#[derive(Clone, Debug)]
+pub struct RegexWrapper(pub Arc<Regex>, pub bool);
+
+impl RegexWrapper {
+    pub fn new(re: Regex, ignore_case: bool) -> Self {
+        RegexWrapper(Arc::new(re), ignore_case)
+    }
+}
+
+impl PartialEq for RegexWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_str() == other.0.as_str() && self.1 == other.1
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Primitive {
@@ -9,6 +26,7 @@ pub enum Primitive {
     Array(Vec<Primitive>),
     Set(Vec<Primitive>),
     Map(HashMap<String, Primitive>),
+    Regex(RegexWrapper),
     Null,
 }
 
@@ -21,6 +39,7 @@ pub fn truthy(value: &Primitive) -> bool {
         Primitive::Array(v) => v.len() > 0,
         Primitive::Set(v) => v.len() > 0,
         Primitive::Map(m) => m.len() > 0,
+        Primitive::Regex(_) => true,
         Primitive::Null => false,
     }
 }
@@ -94,5 +113,6 @@ pub fn type_rank(p: &Primitive) -> u8 {
         Primitive::String(_) => 3,
         Primitive::Set(_) => 4,
         Primitive::Map(_) => 5,
+        Primitive::Regex(_) => 6,
     }
 }
