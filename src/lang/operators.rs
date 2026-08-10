@@ -1,227 +1,194 @@
-use crate::lang::primitive::{Primitive, as_f64, arith, truthy, primitive_eq};
-use crate::lang::sets::{set_push_unique, is_subset, set_equal, set_difference};
-use crate::lang::regex::{match_op, not_match_op};
+use crate::lang::primitive::Primitive;
+use crate::yaql_function;
 
-pub fn add(left: Primitive, right: Primitive) -> Primitive {
-    match (&left, &right) {
-        (Primitive::String(l), Primitive::String(r)) => Primitive::String(format!("{}{}", l, r)),
-        (Primitive::Array(l), Primitive::Array(r)) => {
-            let mut combined = l.clone();
-            combined.extend(r.iter().cloned());
-            Primitive::Array(combined)
-        }
-        (Primitive::Set(l), Primitive::Set(r)) => {
-            let mut combined = l.clone();
-            for e in r {
-                set_push_unique(&mut combined, e);
-            }
-            Primitive::Set(combined)
-        }
-        (Primitive::Set(l), Primitive::Array(r)) => {
-            let mut combined = l.clone();
-            combined.extend(r.iter().cloned());
-            Primitive::Array(combined)
-        }
-        (Primitive::Array(l), Primitive::Set(r)) => {
-            let mut combined = l.clone();
-            combined.extend(r.iter().cloned());
-            Primitive::Array(combined)
-        }
-        (Primitive::Map(l), Primitive::Map(r)) => {
-            let mut combined = l.clone();
-            for (k, v) in r {
-                combined.insert(k.clone(), v.clone());
-            }
-            Primitive::Map(combined)
-        }
-        _ => arith(&left, &right, |a, b| a + b, |a, b| a + b),
-    }
-}
+// --- Internal helpers (used by other modules) ---
 
-pub fn sub(left: Primitive, right: Primitive) -> Primitive {
-    match (&left, &right) {
-        (Primitive::Set(l), Primitive::Set(r)) => Primitive::Set(set_difference(l, r)),
-        _ => arith(&left, &right, |a, b| a - b, |a, b| a - b),
-    }
-}
-
-pub fn mul(left: Primitive, right: Primitive) -> Primitive {
-    match (&left, &right) {
-        (Primitive::String(s), Primitive::Int(n)) => Primitive::String(s.repeat(*n as usize)),
-        (Primitive::Int(n), Primitive::String(s)) => Primitive::String(s.repeat(*n as usize)),
-        (Primitive::Array(a), Primitive::Int(n)) => {
-            Primitive::Array((0..*n).flat_map(|_| a.iter().cloned()).collect())
-        }
-        (Primitive::Int(n), Primitive::Array(a)) => {
-            Primitive::Array((0..*n).flat_map(|_| a.iter().cloned()).collect())
-        }
-        _ => arith(&left, &right, |a, b| a * b, |a, b| a * b),
-    }
-}
-
-pub fn div(left: Primitive, right: Primitive) -> Primitive {
-    match (&left, &right) {
-        (Primitive::Int(_), Primitive::Int(0)) => panic!("division by zero"),
-        (Primitive::Int(_), Primitive::Float(0.0)) => panic!("division by zero"),
-        (Primitive::Float(_), Primitive::Int(0)) => panic!("division by zero"),
-        (Primitive::Float(_), Primitive::Float(0.0)) => panic!("division by zero"),
-        _ => arith(&left, &right, |a, b| a / b, |a, b| (a as f64 / b as f64).floor() as i64),
-    }
-}
-
-pub fn modulo(left: Primitive, right: Primitive) -> Primitive {
-    match (&left, &right) {
-        (Primitive::Int(l), Primitive::Int(r)) => Primitive::Int(*l - r * ((*l as f64 / *r as f64).floor() as i64)),
-        _ => match (as_f64(&left), as_f64(&right)) {
-            (Some(l), Some(r)) => Primitive::Float(l - r * (l / r).floor()),
-            _ => Primitive::Null,
-        },
-    }
-}
-
-pub fn and(left: Primitive, right: Primitive) -> Primitive {
-    if !truthy(&left) { return left }
-    right
-}
-
-pub fn or(left: Primitive, right: Primitive) -> Primitive {
-    if truthy(&left) { return left }
-    right
-}
-
-pub fn eq(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::String(l), Primitive::String(r)) => l == r,
-        (Primitive::Int(l), Primitive::Int(r)) => l == r,
-        (Primitive::Float(l), Primitive::Float(r)) => l == r,
-        (Primitive::Int(l), Primitive::Float(r)) => *l as f64 == *r,
-        (Primitive::Float(l), Primitive::Int(r)) => *l == *r as f64,
-        (Primitive::Int(l), Primitive::Boolean(r)) => (*l == 1) == *r,
-        (Primitive::Boolean(l), Primitive::Int(r)) => *l == (*r == 1),
-        (Primitive::Float(l), Primitive::Boolean(r)) => (*l == 1.0) == *r,
-        (Primitive::Boolean(l), Primitive::Float(r)) => *l == (*r == 1.0),
-        (Primitive::Boolean(l), Primitive::Boolean(r)) => l == r,
-        (Primitive::Null, Primitive::Null) => true,
-        (Primitive::Array(l), Primitive::Array(r)) => l.len() == r.len() && l.iter().zip(r).all(|(a, b)| primitive_eq(a, b)),
-        (Primitive::Set(l), Primitive::Set(r)) => set_equal(l, r),
-        (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| primitive_eq(v, rv))),
-        _ => false
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn neq(left: Primitive, right: Primitive) -> Primitive {
-    let Primitive::Boolean(is_eq) = eq(left, right) else { return Primitive::Boolean(true) };
-    Primitive::Boolean(!is_eq)
-}
-
-pub fn lt(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::Set(l), Primitive::Set(r)) => {
-            l.len() < r.len() && is_subset(l, r)
-        }
-        (Primitive::Null, Primitive::Null) => false,
-        (Primitive::Null, _) => true,
-        (_, Primitive::Null) => false,
-        _ => match (as_f64(&left), as_f64(&right)) {
-            (Some(l), Some(r)) => l < r,
-            _ => false,
-        },
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn lteq(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::Set(l), Primitive::Set(r)) => is_subset(l, r),
-        (Primitive::Null, Primitive::Null) => true,
-        (Primitive::Null, _) => true,
-        (_, Primitive::Null) => false,
-        _ => match (as_f64(&left), as_f64(&right)) {
-            (Some(l), Some(r)) => l <= r,
-            _ => false,
-        },
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn gt(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::Set(l), Primitive::Set(r)) => {
-            l.len() > r.len() && is_subset(r, l)
-        }
-        (Primitive::Null, Primitive::Null) => false,
-        (Primitive::Null, _) => false,
-        (_, Primitive::Null) => true,
-        _ => match (as_f64(&left), as_f64(&right)) {
-            (Some(l), Some(r)) => l > r,
-            _ => false,
-        },
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn gteq(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::Set(l), Primitive::Set(r)) => is_subset(r, l),
-        (Primitive::Null, Primitive::Null) => true,
-        (Primitive::Null, _) => false,
-        (_, Primitive::Null) => true,
-        _ => match (as_f64(&left), as_f64(&right)) {
-            (Some(l), Some(r)) => l >= r,
-            _ => false,
-        },
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn in_op(left: Primitive, right: Primitive) -> Primitive {
-    let result = match (&left, &right) {
-        (Primitive::String(needle), Primitive::String(haystack)) => haystack.contains(needle.as_str()),
-        (_, Primitive::Array(arr, ..)) => arr.iter().any(|e| primitive_eq(e, &left)),
-        (_, Primitive::Set(arr)) => arr.iter().any(|e| primitive_eq(e, &left)),
-        _ => false,
-    };
-    Primitive::Boolean(result)
-}
-
-pub fn dot_access(left: Primitive, right: Primitive) -> Primitive {
+pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().unwrap_or(Primitive::Null),
-        (Primitive::Array(arr), Primitive::String(key)) => {
-            Primitive::Array(arr.iter().map(|e| dot_access(e.clone(), right.clone())).collect())
+        (Primitive::Array(arr), Primitive::String(_key)) => {
+            Primitive::Array(arr.iter().map(|e| dot_access_impl(e.clone(), right.clone())).collect())
         }
         _ => Primitive::Null,
     }
 }
 
-pub struct BinaryOperators;
-
-impl BinaryOperators {
-    pub fn lookup(&self, name: String) -> fn(Primitive, Primitive) -> Primitive {
-        match name.as_str() {
-            "and" => and,
-            "or" => or,
-            "+" => add,
-            "-" => sub,
-            "*" => mul,
-            "/" => div,
-            "mod" => modulo,
-            "=" => eq,
-            "!=" => neq,
-            "<" => lt,
-            "<=" => lteq,
-            ">" => gt,
-            ">=" => gteq,
-            "in" => in_op,
-            "." => dot_access,
-            "?." => dot_access,
-            "=~" => match_op,
-            "!~" => not_match_op,
-            "=>" => |_, _| Primitive::Null,
-            _ => todo!()
-        }
-    }
+// Used by query.rs `sum` to fold array elements via the "+" semantics.
+pub fn add_primitives(acc: Primitive, e: Primitive) -> Primitive {
+    crate::interpreter::dispatch(
+        crate::lang::FUNCTIONS.lookup("+".to_string()),
+        vec![acc, e],
+        vec![],
+    )
 }
 
-pub static BINARY_OPERATORS: BinaryOperators = BinaryOperators {};
+// --- "+" ---
+yaql_function!("+", add_str(l: String, r: String) -> String { format!("{}{}", l, r) });
+yaql_function!("+", add_arr(l: Vec<Primitive>, r: Vec<Primitive>) -> Vec<Primitive> { let mut c = l; c.extend(r); c });
+yaql_function!("+", add_set_set(l: SetVec, r: SetVec) -> SetVec {
+    let mut c = l.0;
+    for e in &r.0 { crate::lang::sets::set_push_unique(&mut c, e); }
+    SetVec(c)
+});
+yaql_function!("+", add_set_arr(l: SetVec, r: Vec<Primitive>) -> Vec<Primitive> {
+    let mut c = l.0; c.extend(r); c
+});
+yaql_function!("+", add_arr_set(l: Vec<Primitive>, r: SetVec) -> Vec<Primitive> {
+    let mut c = l; c.extend(r.0); c
+});
+yaql_function!("+", add_map(l: HashMap<String, Primitive>, r: HashMap<String, Primitive>) -> HashMap<String, Primitive> {
+    let mut c = l; for (k, v) in r { c.insert(k, v); } c
+});
+yaql_function!("+", add_int(l: i64, r: i64) -> i64 { l + r });
+yaql_function!("+", add_num(l: Number, r: Number) -> f64 { l.0 + r.0 });
+
+// --- "-" ---
+yaql_function!("-", sub_set(l: SetVec, r: SetVec) -> SetVec {
+    SetVec(crate::lang::sets::set_difference(&l.0, &r.0))
+});
+yaql_function!("-", sub_int(l: i64, r: i64) -> i64 { l - r });
+yaql_function!("-", sub_num(l: Number, r: Number) -> f64 { l.0 - r.0 });
+
+// --- "*" ---
+yaql_function!("*", mul_str_int(s: String, n: i64) -> String { s.repeat(n as usize) });
+yaql_function!("*", mul_int_str(n: i64, s: String) -> String { s.repeat(n as usize) });
+yaql_function!("*", mul_arr_int(a: Vec<Primitive>, n: i64) -> Vec<Primitive> {
+    (0..n).flat_map(|_| a.iter().cloned()).collect()
+});
+yaql_function!("*", mul_int_arr(n: i64, a: Vec<Primitive>) -> Vec<Primitive> {
+    (0..n).flat_map(|_| a.iter().cloned()).collect()
+});
+yaql_function!("*", mul_int(l: i64, r: i64) -> i64 { l * r });
+yaql_function!("*", mul_num(l: Number, r: Number) -> f64 { l.0 * r.0 });
+
+// --- "/" ---
+yaql_function!("/", div_int(l: i64, r: i64) -> i64 {
+    if r == 0 { panic!("division by zero") }
+    (l as f64 / r as f64).floor() as i64
+});
+yaql_function!("/", div_num(l: Number, r: Number) -> f64 {
+    if r.0 == 0.0 { panic!("division by zero") }
+    l.0 / r.0
+});
+
+// --- "mod" ---
+yaql_function!("mod", mod_int(l: i64, r: i64) -> i64 {
+    l - r * ((l as f64 / r as f64).floor() as i64)
+});
+yaql_function!("mod", mod_num(l: Number, r: Number) -> f64 {
+    l.0 - r.0 * (l.0 / r.0).floor()
+});
+
+// --- "=" ---
+yaql_function!("=", eq_str(l: String, r: String) -> bool { l == r });
+yaql_function!("=", eq_num(l: Number, r: Number) -> bool { l.0 == r.0 });
+yaql_function!("=", eq_bool(l: bool, r: bool) -> bool { l == r });
+yaql_function!("=", eq_num_bool(l: Number, r: bool) -> bool { (l.0 == 1.0) == r });
+yaql_function!("=", eq_bool_num(l: bool, r: Number) -> bool { l == (r.0 == 1.0) });
+yaql_function!("=", eq_null(l: Null, r: Null) -> bool { true });
+yaql_function!("=", eq_arr(l: Vec<Primitive>, r: Vec<Primitive>) -> bool {
+    l.len() == r.len() && l.iter().zip(r.iter()).all(|(a, b)| crate::lang::primitive::primitive_eq(a, b))
+});
+yaql_function!("=", eq_set(l: SetVec, r: SetVec) -> bool {
+    crate::lang::sets::set_equal(&l.0, &r.0)
+});
+yaql_function!("=", eq_map(l: HashMap<String, Primitive>, r: HashMap<String, Primitive>) -> bool {
+    l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| crate::lang::primitive::primitive_eq(v, rv)))
+});
+yaql_function!("=", eq_any(l: Any, r: Any) -> bool { false });
+
+// --- "!=" ---
+yaql_function!("!=", neq(l: Any, r: Any) -> bool { !crate::lang::primitive::primitive_eq(&l.0, &r.0) });
+
+// --- "<" ---
+yaql_function!("<", lt_set(l: SetVec, r: SetVec) -> bool {
+    l.0.len() < r.0.len() && crate::lang::sets::is_subset(&l.0, &r.0)
+});
+yaql_function!("<", lt_null_null(l: Null, r: Null) -> bool { false });
+yaql_function!("<", lt_null_any(l: Null, r: Any) -> bool { true });
+yaql_function!("<", lt_any_null(l: Any, r: Null) -> bool { false });
+yaql_function!("<", lt_num(l: Number, r: Number) -> bool { l.0 < r.0 });
+yaql_function!("<", lt_any(l: Any, r: Any) -> bool { false });
+
+// --- "<=" ---
+yaql_function!("<=", lteq_set(l: SetVec, r: SetVec) -> bool {
+    crate::lang::sets::is_subset(&l.0, &r.0)
+});
+yaql_function!("<=", lteq_null_null(l: Null, r: Null) -> bool { true });
+yaql_function!("<=", lteq_null_any(l: Null, r: Any) -> bool { true });
+yaql_function!("<=", lteq_any_null(l: Any, r: Null) -> bool { false });
+yaql_function!("<=", lteq_num(l: Number, r: Number) -> bool { l.0 <= r.0 });
+yaql_function!("<=", lteq_any(l: Any, r: Any) -> bool { false });
+
+// --- ">" ---
+yaql_function!(">", gt_set(l: SetVec, r: SetVec) -> bool {
+    l.0.len() > r.0.len() && crate::lang::sets::is_subset(&r.0, &l.0)
+});
+yaql_function!(">", gt_null_null(l: Null, r: Null) -> bool { false });
+yaql_function!(">", gt_null_any(l: Null, r: Any) -> bool { false });
+yaql_function!(">", gt_any_null(l: Any, r: Null) -> bool { true });
+yaql_function!(">", gt_num(l: Number, r: Number) -> bool { l.0 > r.0 });
+yaql_function!(">", gt_any(l: Any, r: Any) -> bool { false });
+
+// --- ">=" ---
+yaql_function!(">=", gteq_set(l: SetVec, r: SetVec) -> bool {
+    crate::lang::sets::is_subset(&r.0, &l.0)
+});
+yaql_function!(">=", gteq_null_null(l: Null, r: Null) -> bool { true });
+yaql_function!(">=", gteq_null_any(l: Null, r: Any) -> bool { false });
+yaql_function!(">=", gteq_any_null(l: Any, r: Null) -> bool { true });
+yaql_function!(">=", gteq_num(l: Number, r: Number) -> bool { l.0 >= r.0 });
+yaql_function!(">=", gteq_any(l: Any, r: Any) -> bool { false });
+
+// --- "in" ---
+yaql_function!("in", in_str(l: String, r: String) -> bool { r.contains(l.as_str()) });
+yaql_function!("in", in_arr(l: Any, r: Vec<Primitive>) -> bool {
+    r.iter().any(|e| crate::lang::primitive::primitive_eq(e, &l.0))
+});
+yaql_function!("in", in_set(l: Any, r: SetVec) -> bool {
+    r.0.iter().any(|e| crate::lang::primitive::primitive_eq(e, &l.0))
+});
+yaql_function!("in", in_any(l: Any, r: Any) -> bool { false });
+
+// --- "." ---
+yaql_function!(".", dot_map(l: HashMap<String, Primitive>, r: String) -> Primitive {
+    l.get(&r).cloned().unwrap_or(Primitive::Null)
+});
+yaql_function!(".", dot_arr(l: Vec<Primitive>, r: String) -> Primitive {
+    crate::lang::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
+});
+yaql_function!(".", dot_any(l: Any, r: Any) -> Primitive { Primitive::Null });
+
+// --- "?." (same as "." — interpreter handles the Null check before dispatch) ---
+yaql_function!("?.", dot_map_opt(l: HashMap<String, Primitive>, r: String) -> Primitive {
+    l.get(&r).cloned().unwrap_or(Primitive::Null)
+});
+yaql_function!("?.", dot_arr_opt(l: Vec<Primitive>, r: String) -> Primitive {
+    crate::lang::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
+});
+yaql_function!("?.", dot_any_opt(l: Any, r: Any) -> Primitive { Primitive::Null });
+
+// --- "=>" ---
+yaql_function!("=>", mapping_arrow(l: Any, r: Any) -> Primitive { Primitive::Null });
+
+// --- "=~" ---
+yaql_function!("=~", match_regex(s: String, re: RegexWrapper) -> bool {
+    re.0.is_match(s.as_str())
+});
+yaql_function!("=~", match_pattern(s: String, p: String) -> bool {
+    let re = regex::Regex::new(p.as_str())
+        .unwrap_or_else(|_| regex::Regex::new(&regex::escape(p.as_str())).unwrap());
+    re.is_match(s.as_str())
+});
+yaql_function!("=~", match_any(l: Any, r: Any) -> Primitive { Primitive::Null });
+
+// --- "!~" ---
+yaql_function!("!~", nmatch_regex(s: String, re: RegexWrapper) -> bool {
+    !re.0.is_match(s.as_str())
+});
+yaql_function!("!~", nmatch_pattern(s: String, p: String) -> bool {
+    let re = regex::Regex::new(p.as_str())
+        .unwrap_or_else(|_| regex::Regex::new(&regex::escape(p.as_str())).unwrap());
+    !re.is_match(s.as_str())
+});
+yaql_function!("!~", nmatch_any(l: Any, r: Any) -> Primitive { Primitive::Null });

@@ -1,7 +1,4 @@
-use crate::lang::primitive::Primitive;
 use crate::yaql_function;
-use crate::yaql_raw_function;
-use crate::lang::functions::ArgSpec;
 
 // --- Typed function definitions + registration ---
 
@@ -67,19 +64,18 @@ yaql_function!("bitwiseNot", bitwise_not(a: i64) -> i64 { !a });
 yaql_function!("shiftBitsLeft", shift_bits_left(a: i64, b: i64) -> i64 { a << b });
 yaql_function!("shiftBitsRight", shift_bits_right(a: i64, b: i64) -> i64 { a >> b });
 
-pub fn random_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+yaql_function!("random", random_zero() -> f64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     let seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
     let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-    let mut next = || { state = state.wrapping_mul(6364136223846793005).wrapping_add(1); (state >> 33) as f64 / (1u64 << 31) as f64 };
-    if args.is_empty() {
-        Primitive::Float(next())
-    } else if args.len() == 2 {
-        let lo = match &args[0] { Primitive::Int(n) => *n, _ => return Primitive::Null };
-        let hi = match &args[1] { Primitive::Int(n) => *n, _ => return Primitive::Null };
-        Primitive::Int(lo + (next() * (hi - lo + 1) as f64) as i64)
-    } else {
-        Primitive::Null
-    }
-}
-yaql_raw_function!("random", random_fn, ArgSpec::Min(0), [], false);
+    state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+    (state >> 33) as f64 / (1u64 << 31) as f64
+});
+yaql_function!("random", random_range(lo: i64, hi: i64) -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+    let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+    state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+    let r = (state >> 33) as f64 / (1u64 << 31) as f64;
+    lo + (r * (hi - lo + 1) as f64) as i64
+});

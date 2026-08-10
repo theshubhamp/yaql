@@ -41,40 +41,31 @@ pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Pri
 }
 yaql_raw_function!("set", set_fn, ArgSpec::Varargs, [], false);
 
-pub fn set_union(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let (left, right) = match (&args[0], &args[1]) {
-        (Primitive::Set(l), Primitive::Set(r)) => (l.clone(), r.clone()),
-        (Primitive::Set(l), Primitive::Array(r)) => (l.clone(), r.clone()),
-        (Primitive::Array(l), Primitive::Set(r)) => (l.clone(), r.clone()),
-        _ => return Primitive::Null,
-    };
-    let mut result = left;
-    for e in &right {
-        set_push_unique(&mut result, e);
-    }
-    Primitive::Set(result)
-}
-yaql_raw_function!("union", set_union, ArgSpec::Exact(2), [Type::Any, Type::Any], false);
+yaql_function!("union", union_ss(l: SetVec, r: SetVec) -> SetVec {
+    let mut c = l.0;
+    for e in &r.0 { crate::lang::sets::set_push_unique(&mut c, e); }
+    SetVec(c)
+});
+yaql_function!("union", union_sa(l: SetVec, r: Vec<Primitive>) -> Vec<Primitive> {
+    let mut c = l.0; c.extend(r); c
+});
+yaql_function!("union", union_as(l: Vec<Primitive>, r: SetVec) -> Vec<Primitive> {
+    let mut c = l; c.extend(r.0); c
+});
 
-pub fn set_difference_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let (left, right) = match (&args[0], &args[1]) {
-        (Primitive::Set(l), Primitive::Set(r)) => (l.clone(), r.clone()),
-        (Primitive::Set(l), Primitive::Array(r)) => (l.clone(), r.clone()),
-        _ => return Primitive::Null,
-    };
-    Primitive::Set(set_difference(&left, &right))
-}
-yaql_raw_function!("difference", set_difference_fn, ArgSpec::Exact(2), [Type::Any, Type::Any], false);
+yaql_function!("difference", diff_ss(l: SetVec, r: SetVec) -> SetVec {
+    SetVec(crate::lang::sets::set_difference(&l.0, &r.0))
+});
+yaql_function!("difference", diff_sa(l: SetVec, r: Vec<Primitive>) -> SetVec {
+    SetVec(crate::lang::sets::set_difference(&l.0, &r))
+});
 
-pub fn set_symmetric_difference_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let (left, right) = match (&args[0], &args[1]) {
-        (Primitive::Set(l), Primitive::Set(r)) => (l.clone(), r.clone()),
-        (Primitive::Set(l), Primitive::Array(r)) => (l.clone(), r.clone()),
-        _ => return Primitive::Null,
-    };
-    Primitive::Set(set_symmetric_difference(&left, &right))
-}
-yaql_raw_function!("symmetricDifference", set_symmetric_difference_fn, ArgSpec::Exact(2), [Type::Any, Type::Any], false);
+yaql_function!("symmetricDifference", symdiff_ss(l: SetVec, r: SetVec) -> SetVec {
+    SetVec(crate::lang::sets::set_symmetric_difference(&l.0, &r.0))
+});
+yaql_function!("symmetricDifference", symdiff_sa(l: SetVec, r: Vec<Primitive>) -> SetVec {
+    SetVec(crate::lang::sets::set_symmetric_difference(&l.0, &r))
+});
 
 pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Primitive::Set(mut elems) = args[0].clone() else { return Primitive::Null };

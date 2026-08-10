@@ -58,27 +58,6 @@ pub fn str_matches_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 }
 yaql_raw_function!("matches", str_matches_fn, ArgSpec::Exact(2), [Type::String, Type::String], false);
 
-// --- =~ operator (partial match) ---
-// string =~ regex  OR  string =~ string
-pub fn match_op(left: Primitive, right: Primitive) -> Primitive {
-    let Primitive::String(s) = &left else { return Primitive::Null };
-    let re: Regex = match &right {
-        Primitive::Regex(r) => (*r.0).clone(),
-        Primitive::String(p) => match Regex::new(p) {
-            Ok(r) => r,
-            Err(_) => return Primitive::Null,
-        },
-        _ => return Primitive::Null,
-    };
-    Primitive::Boolean(re.is_match(&s))
-}
-
-// string !~ regex  OR  string !~ string
-pub fn not_match_op(left: Primitive, right: Primitive) -> Primitive {
-    let Primitive::Boolean(b) = match_op(left, right) else { return Primitive::Null };
-    Primitive::Boolean(!b)
-}
-
 // --- search ---
 // regex.search(string) -> string | null  (first full match value)
 // regex.search(string, selector) -> selector applied to match object

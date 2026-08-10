@@ -1,8 +1,7 @@
 use crate::lang::primitive::{Primitive, compare};
 use crate::yaql_function;
 use crate::yaql_raw_function;
-use crate::lang::functions::ArgSpec;
-use crate::lang::functions::Type;
+use crate::lang::functions::{ArgSpec, Type};
 use std::collections::HashMap;
 
 yaql_function!("get", get_fn(m: HashMap<String, Primitive>, key: String) -> Primitive {
@@ -152,15 +151,7 @@ yaql_function!("contains", contains_string(s: String, sub: String) -> bool {
     s.contains(sub.as_str())
 });
 
-pub fn max(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let iter: Vec<Primitive> = if args.len() == 1 {
-        match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
-    } else if args.len() == 2 && matches!(&args[0], Primitive::Array(_) | Primitive::Set(_)) {
-        // Method form: collection.max(default) — return default if empty
-        let coll = match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), _ => vec![] };
-        if coll.is_empty() { return args[1].clone(); }
-        coll
-    } else { args };
+pub fn max_impl(iter: Vec<Primitive>) -> Primitive {
     let mut result: Option<Primitive> = None;
     for arg in iter {
         result = Some(match (result, arg) {
@@ -171,16 +162,24 @@ pub fn max(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primit
     }
     result.unwrap_or(Primitive::Null)
 }
-yaql_raw_function!("max", max, ArgSpec::Min(1), [], false);
 
-pub fn min(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let iter: Vec<Primitive> = if args.len() == 1 {
-        match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), other => vec![other.clone()] }
-    } else if args.len() == 2 && matches!(&args[0], Primitive::Array(_) | Primitive::Set(_)) {
-        let coll = match &args[0] { Primitive::Array(a) => a.clone(), Primitive::Set(a) => a.clone(), _ => vec![] };
-        if coll.is_empty() { return args[1].clone(); }
-        coll
-    } else { args };
+pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    max_impl(args)
+}
+yaql_raw_function!("max", max_varargs, ArgSpec::Min(1), [Type::Any], false);
+
+yaql_function!("max", max_arr(arr: Vec<Primitive>) -> Primitive { crate::lang::collections::max_impl(arr) });
+yaql_function!("max", max_set(arr: SetVec) -> Primitive { crate::lang::collections::max_impl(arr.0) });
+yaql_function!("max", max_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+    if arr.is_empty() { return default.0 }
+    crate::lang::collections::max_impl(arr)
+});
+yaql_function!("max", max_set_default(arr: SetVec, default: Any) -> Primitive {
+    if arr.0.is_empty() { return default.0 }
+    crate::lang::collections::max_impl(arr.0)
+});
+
+pub fn min_impl(iter: Vec<Primitive>) -> Primitive {
     let mut result: Option<Primitive> = None;
     for arg in iter {
         result = Some(match (result, arg) {
@@ -192,7 +191,22 @@ pub fn min(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primit
     }
     result.unwrap_or(Primitive::Null)
 }
-yaql_raw_function!("min", min, ArgSpec::Min(1), [], false);
+
+pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+    min_impl(args)
+}
+yaql_raw_function!("min", min_varargs, ArgSpec::Min(1), [Type::Any], false);
+
+yaql_function!("min", min_arr(arr: Vec<Primitive>) -> Primitive { crate::lang::collections::min_impl(arr) });
+yaql_function!("min", min_set(arr: SetVec) -> Primitive { crate::lang::collections::min_impl(arr.0) });
+yaql_function!("min", min_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+    if arr.is_empty() { return default.0 }
+    crate::lang::collections::min_impl(arr)
+});
+yaql_function!("min", min_set_default(arr: SetVec, default: Any) -> Primitive {
+    if arr.0.is_empty() { return default.0 }
+    crate::lang::collections::min_impl(arr.0)
+});
 
 // --- List mutation ---
 

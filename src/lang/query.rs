@@ -113,14 +113,11 @@ yaql_function!("distinct", distinct(arr: Vec<Primitive>) -> Vec<Primitive> {
     seen
 });
 
-pub fn sum(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let arr: Vec<Primitive> = match args.first() {
-        Some(Primitive::Array(arr)) => arr.clone(),
-        Some(Primitive::Set(arr)) => arr.clone(),
-        _ => return Primitive::Null,
-    };
-    let init = if args.len() > 1 {
-        args[1].clone()
+// sum: array.sum() or array.sum(init)
+// Set dispatch (SetVec) reuses the same impl.
+pub fn sum_impl(arr: Vec<Primitive>, init: Option<Primitive>) -> Primitive {
+    let init = if let Some(i) = init {
+        i
     } else if arr.first().map(|e| matches!(e, Primitive::String(_))).unwrap_or(false) {
         Primitive::String(String::new())
     } else if arr.first().map(|e| matches!(e, Primitive::Array(_))).unwrap_or(false) {
@@ -128,10 +125,12 @@ pub fn sum(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primit
     } else {
         Primitive::Int(0)
     };
-    arr.iter().fold(init, |acc, e| crate::lang::operators::add(acc, e.clone()))
+    arr.iter().fold(init, |acc, e| crate::lang::operators::add_primitives(acc, e.clone()))
 }
-yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Array], false);
-yaql_raw_function!("sum", sum, ArgSpec::Min(1), [Type::Set], false);
+yaql_function!("sum", sum_arr(arr: Vec<Primitive>) -> Primitive { crate::lang::query::sum_impl(arr, None) });
+yaql_function!("sum", sum_set(arr: SetVec) -> Primitive { crate::lang::query::sum_impl(arr.0, None) });
+yaql_function!("sum", sum_arr_init(arr: Vec<Primitive>, init: Any) -> Primitive { crate::lang::query::sum_impl(arr, Some(init.0)) });
+yaql_function!("sum", sum_set_init(arr: SetVec, init: Any) -> Primitive { crate::lang::query::sum_impl(arr.0, Some(init.0)) });
 
 yaql_function!("splitAt", split_at_fn(arr: Vec<Primitive>, pos: i64) -> Vec<Primitive> {
     let len = arr.len() as i64;

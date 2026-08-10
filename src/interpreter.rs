@@ -1,5 +1,5 @@
 use crate::ast::{Value, Visitor};
-use crate::lang::{truthy, ArgSpec, BINARY_OPERATORS, FUNCTIONS, Primitive, Spec};
+use crate::lang::{truthy, ArgSpec, FUNCTIONS, Primitive, Spec};
 use crate::lang::primitive::LambdaBody;
 
 pub use crate::lang::primitive::LambdaBody as Lambda;
@@ -196,7 +196,7 @@ impl Visitor<Option<Primitive>> for Interpreter {
             _ => {
                 let left_value = self.visit(left)?;
                 let right_value = self.visit(right)?;
-                Some(BINARY_OPERATORS.lookup(op)(left_value, right_value))
+                Some(dispatch(crate::lang::FUNCTIONS.lookup(op.clone()), vec![left_value, right_value], vec![]))
             }
         }
     }
@@ -334,7 +334,7 @@ impl Interpreter {
                     _ => {
                         let left_value = self.visit_mut(*left)?;
                         let right_value = self.visit_mut(*right)?;
-                        Some(BINARY_OPERATORS.lookup(op)(left_value, right_value))
+                        Some(dispatch(crate::lang::FUNCTIONS.lookup(op.clone()), vec![left_value, right_value], vec![]))
                     }
                 }
             }
@@ -430,7 +430,7 @@ impl Interpreter {
 }
 
 /// Find the best matching overload and call it.
-fn dispatch(overloads: Vec<Spec>, args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+pub(crate) fn dispatch(overloads: Vec<Spec>, args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let mut overloads = overloads;
     overloads.sort_by(|a, b| {
         let score = |s: &Spec| {
