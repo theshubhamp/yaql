@@ -47,16 +47,13 @@ yaql_function!("matches", regex_matches(re: RegexWrapper, s: String) -> bool {
 });
 
 // string.matches(string) -> bool (full match via anchoring)
-pub fn str_matches_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::String(pattern) = &args[1] else { return Primitive::Null };
+yaql_function!("matches", str_matches(s: String, pattern: String) -> Option<bool> {
     let anchored = format!("^(?:{})$", pattern);
-    match Regex::new(&anchored) {
-        Ok(re) => Primitive::Boolean(re.is_match(&s)),
-        Err(_) => Primitive::Null,
+    match regex::Regex::new(&anchored) {
+        Ok(re) => Some(re.is_match(&s)),
+        Err(_) => None,
     }
-}
-yaql_raw_function!("matches", str_matches_fn, ArgSpec::Exact(2), [Type::String, Type::String], false);
+});
 
 // --- search ---
 // regex.search(string) -> string | null  (first full match value)

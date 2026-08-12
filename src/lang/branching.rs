@@ -1,4 +1,5 @@
 use crate::lang::primitive::{Primitive, truthy};
+use crate::yaql_function;
 use crate::yaql_raw_function;
 use crate::lang::functions::ArgSpec;
 use crate::lang::functions::Type;
@@ -40,10 +41,9 @@ pub fn examine(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Pr
 }
 yaql_raw_function!("examine", examine, ArgSpec::Varargs, [], false);
 
-pub fn is_boolean(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    Primitive::Boolean(matches!(args[0], Primitive::Boolean(_)))
-}
-yaql_raw_function!("isBoolean", is_boolean, ArgSpec::Exact(1), [Type::Any], false);
+yaql_function!("isBoolean", is_boolean(v: Any) -> bool {
+    matches!(v.0, Primitive::Boolean(_))
+});
 
 pub fn coalesce(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     for arg in args {
@@ -105,10 +105,7 @@ pub fn with_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Pr
 yaql_raw_function!("with", with_fn, ArgSpec::Min(1), [Type::Any], false);
 
 // memorize: just returns the value (no lazy eval in our impl)
-pub fn memorize_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    if args.is_empty() { Primitive::Null } else { args[0].clone() }
-}
-yaql_raw_function!("memorize", memorize_fn, ArgSpec::Exact(1), [Type::Any], false);
+yaql_function!("memorize", memorize(v: Any) -> Primitive { v.0 });
 
 // generateMany: graph traversal
 pub fn generate_many_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {

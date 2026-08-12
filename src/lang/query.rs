@@ -41,7 +41,10 @@ yaql_function!("take", take_set(arr: SetVec, n: i64) -> SetVec {
     let n = (n as usize).min(arr.0.len());
     SetVec(arr.0[..n].to_vec())
 });
-yaql_raw_function!("limit", take::func, ArgSpec::Exact(2), [Type::Array, Type::Int], false);
+yaql_function!("limit", limit(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
+    let n = (n as usize).min(arr.len());
+    arr[..n].to_vec()
+});
 
 yaql_function!("count", count_array(arr: Vec<Primitive>) -> i64 { arr.len() as i64 });
 yaql_function!("count", count_set(arr: SetVec) -> i64 { arr.0.len() as i64 });
@@ -53,37 +56,31 @@ yaql_function!("first", first_set(arr: SetVec) -> Option<Primitive> { arr.0.firs
 yaql_function!("last", last(arr: Vec<Primitive>) -> Option<Primitive> { arr.last().cloned() });
 yaql_function!("last", last_set(arr: SetVec) -> Option<Primitive> { arr.0.last().cloned() });
 
-pub fn first_default_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    arr.first().cloned().unwrap_or_else(|| args[1].clone())
-}
-yaql_raw_function!("first", first_default_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
-yaql_raw_function!("first", first_default_fn, ArgSpec::Exact(2), [Type::Set, Type::Any], false);
-
-pub fn last_default_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    arr.last().cloned().unwrap_or_else(|| args[1].clone())
-}
-yaql_raw_function!("last", last_default_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
-yaql_raw_function!("last", last_default_fn, ArgSpec::Exact(2), [Type::Set, Type::Any], false);
+yaql_function!("first", first_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+    arr.first().cloned().unwrap_or(default.0)
+});
+yaql_function!("first", first_default_set(arr: SetVec, default: Any) -> Primitive {
+    arr.0.first().cloned().unwrap_or(default.0)
+});
+yaql_function!("last", last_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+    arr.last().cloned().unwrap_or(default.0)
+});
+yaql_function!("last", last_default_set(arr: SetVec, default: Any) -> Primitive {
+    arr.0.last().cloned().unwrap_or(default.0)
+});
 
 yaql_function!("range", range_one(n: i64) -> Vec<Primitive> { (0..n).map(Primitive::Int).collect() });
 yaql_function!("range", range_two(start: i64, end: i64) -> Vec<Primitive> { (start..end).map(Primitive::Int).collect() });
 
-pub fn range_three(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Int(start) = args[0] else { return Primitive::Null };
-    let Primitive::Int(end) = args[1] else { return Primitive::Null };
-    let Primitive::Int(step) = args[2] else { return Primitive::Null };
-    let result: Vec<Primitive> = if step > 0 {
-        (0..).map(|i| start + i * step).take_while(|&x| x < end).map(Primitive::Int).collect()
-    } else if step < 0 {
-        (0..).map(|i| start + i * step).take_while(|&x| x > end).map(Primitive::Int).collect()
+yaql_function!("range", range_three(start: i64, end: i64, step: i64) -> Option<Vec<Primitive>> {
+    if step == 0 {
+        None
+    } else if step > 0 {
+        Some((0..).map(|i| start + i * step).take_while(|&x| x < end).map(Primitive::Int).collect())
     } else {
-        return Primitive::Null;
-    };
-    Primitive::Array(result)
-}
-yaql_raw_function!("range", range_three, ArgSpec::Exact(3), [Type::Int, Type::Int, Type::Int], false);
+        Some((0..).map(|i| start + i * step).take_while(|&x| x > end).map(Primitive::Int).collect())
+    }
+});
 
 pub fn append(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
     let Some(Primitive::Array(arr)) = args.first() else { return Primitive::Null };
