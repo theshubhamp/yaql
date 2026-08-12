@@ -22,7 +22,13 @@ impl From<Primitive> for EvalResult {
 }
 
 pub fn evaluate(expr: &str, context: serde_json::Value) -> EvalResult {
-    let context = json::json_to_primitive(&context);
+    evaluate_with(expr, json::json_to_primitive(&context))
+}
+
+/// Evaluate `expr` against a Rust-native `Primitive` context, bypassing JSON
+/// (de)serialization. Intended for embedding and for benchmarks that measure
+/// dispatch throughput rather than JSON parsing.
+pub fn evaluate_with(expr: &str, context: Primitive) -> EvalResult {
     let ast = match parser::Parser::parse(expr) {
         Ok(ast) => ast,
         Err(e) => return EvalResult::ParseError(format!("{}", e)),
