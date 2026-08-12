@@ -333,12 +333,60 @@ macro_rules! yaql_raw_function {
 pub struct Functions;
 
 impl Functions {
-    pub fn lookup(&self, name: String) -> Vec<Spec> {
-        inventory::iter::<Spec>()
-            .filter(|s| s.name == name.as_str())
-            .copied()
-            .collect()
+    /// Cached, pre-sorted overload lookup. Returns a `'static` slice so the
+    /// per-call hot path avoids both the inventory scan and the sort.
+    pub fn lookup(&self, name: &str) -> &'static [Spec] {
+        cached_overloads(name)
     }
 }
 
 pub static FUNCTIONS: Functions = Functions {};
+
+use std::sync::OnceLock;
+use std::collections::HashMap as StdHashMap;
+
+/// Pre-sorted overload list for a function name, cached after first use.
+/// The sort in `dispatch` is deterministic, so we can hoist it out of the
+/// per-call hot path.
+pub struct CachedOverloads {
+    pub ordered: Vec<Spec>,
+}
+
+fn sort_overloads(mut overloads: Vec<Spec>) -> Vec<Spec> {
+    overloads.sort_by(|a, b| {
+        let score = |s: &Spec| {
+            s.arg_types.iter().map(|ty| match ty {
+                crate::lang::Type::Any => 3,
+                crate::lang::Type::Number => 2,
+                _ => 0,
+            }).sum::<u32>()
+        };
+        let sa = score(a);
+        let sb = score(b);
+        sa.cmp(&sb).then_with(|| {
+            b.arg_types.len().cmp(&a.arg_types.len())
+        })
+    });
+    overloads
+}
+
+static OVERLOAD_CACHE: OnceLock<StdHashMap<String, Vec<Spec>>> = OnceLock::new();
+
+/// Look up and pre-sort overloads for `name`, caching the result.
+pub fn cached_overloads(name: &str) -> &'static Vec<Spec> {
+    let map = OVERLOAD_CACHE.get_or_init(|| {
+        let mut m = StdHashMap::new();
+        for spec in inventory::iter::<Spec>() {
+            m.entry(spec.name.to_string())
+                .or_insert_with(Vec::new)
+                .push(*spec);
+        }
+        for v in m.values_mut() {
+            *v = sort_overloads(std::mem::take(v));
+        }
+        m
+    });
+    map.get(name).map(|v| v as &Vec<Spec>).unwrap_or(&EMPTY_OVERLOADS)
+}
+
+static EMPTY_OVERLOADS: Vec<Spec> = Vec::new();

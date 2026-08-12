@@ -208,7 +208,7 @@ pub fn regex_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive,
         let groups: Vec<Primitive> = (0..cap.len()).map(|i| {
             cap.get(i).map(|g| match_to_map(&g, s)).unwrap_or(Primitive::Null)
         }).collect();
-        let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
+        let mut interp = crate::interpreter::Interpreter { contexts: (*lambda.env).clone(), current_func: None };
         interp.push_context(Primitive::Array(groups));
         interp.push_context(match_obj);
         let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
@@ -239,7 +239,7 @@ pub fn str_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, P
         let groups: Vec<Primitive> = (0..cap.len()).map(|i| {
             cap.get(i).map(|g| match_to_map(&g, s)).unwrap_or(Primitive::Null)
         }).collect();
-        let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
+        let mut interp = crate::interpreter::Interpreter { contexts: (*lambda.env).clone(), current_func: None };
         interp.push_context(Primitive::Array(groups));
         interp.push_context(match_obj);
         let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
@@ -274,7 +274,7 @@ fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&rege
     };
     // Build context: push match object as $, and capture groups array for $1/$2
     let match_obj = match_to_map(m, s);
-    let mut interp = Interpreter { contexts: lambda.env.clone(), current_func: None };
+    let mut interp = Interpreter { contexts: (*lambda.env).clone(), current_func: None };
     // For $1/$2: push array of capture group objects
     if let Some(cap) = captures {
         let groups: Vec<Primitive> = (0..cap.len()).map(|i| {

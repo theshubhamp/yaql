@@ -5,7 +5,6 @@ pub mod lang;
 pub mod lexer;
 pub mod parser;
 
-use ast::Visitor;
 use interpreter::Interpreter;
 use lang::Primitive;
 
@@ -34,7 +33,7 @@ pub fn evaluate_with(expr: &str, context: Primitive) -> EvalResult {
         Err(e) => return EvalResult::ParseError(format!("{}", e)),
     };
     let mut interpreter = Interpreter::new(context);
-    match interpreter.visit(ast) {
+    match interpreter.visit(&ast) {
         Some(value) => {
             // Auto-call top-level lambdas (e.g. `with(5) -> $ + 1`)
             if let Primitive::Lambda(ref lambda) = value {

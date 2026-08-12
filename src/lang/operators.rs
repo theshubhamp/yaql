@@ -16,7 +16,7 @@ pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
 // Used by query.rs `sum` to fold array elements via the "+" semantics.
 pub fn add_primitives(acc: Primitive, e: Primitive) -> Primitive {
     crate::interpreter::dispatch(
-        crate::lang::FUNCTIONS.lookup("+".to_string()),
+        crate::lang::FUNCTIONS.lookup("+"),
         vec![acc, e],
         vec![],
     )

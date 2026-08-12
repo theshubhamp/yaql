@@ -508,7 +508,7 @@ yaql_raw_function!("toDict", to_dict_fn, ArgSpec::Min(2), [Type::Array, Type::An
 
 // Evaluate a 2-arg lambda ($1 = acc, $2 = element, $ = element)
 pub fn eval_lambda_2arg(lambda: &LambdaBody, acc: Primitive, element: Primitive) -> Primitive {
-    let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
+    let mut interp = crate::interpreter::Interpreter { contexts: (*lambda.env).clone(), current_func: None };
     let elem_clone = element.clone();
     interp.push_context(element);
     interp.push_context(Primitive::Array(vec![acc, elem_clone]));

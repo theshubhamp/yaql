@@ -21,7 +21,7 @@ impl PartialEq for RegexWrapper {
 #[derive(Clone, Debug)]
 pub struct LambdaBody {
     pub body: Box<Value>,
-    pub env: Vec<Primitive>,
+    pub env: Arc<Vec<Primitive>>,
 }
 
 #[derive(Clone, Debug)]
