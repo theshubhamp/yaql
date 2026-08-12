@@ -14,12 +14,12 @@ thread_local! {
     static SORT_DESC: RefCell<Vec<bool>> = RefCell::new(Vec::new());
 }
 
-fn store_sort_keys(keys: Vec<Vec<Primitive>>, desc: Vec<bool>) {
+pub fn store_sort_keys(keys: Vec<Vec<Primitive>>, desc: Vec<bool>) {
     SORT_KEYS.with(|sk| { *sk.borrow_mut() = keys; });
     SORT_DESC.with(|sd| { *sd.borrow_mut() = desc; });
 }
 
-fn load_sort_keys() -> (Vec<Vec<Primitive>>, Vec<bool>) {
+pub fn load_sort_keys() -> (Vec<Vec<Primitive>>, Vec<bool>) {
     let keys = SORT_KEYS.with(|sk| sk.borrow().clone());
     let desc = SORT_DESC.with(|sd| sd.borrow().clone());
     (keys, desc)
@@ -184,105 +184,94 @@ fn get_lambda(args: &[Primitive], idx: usize) -> Option<&LambdaBody> {
 }
 
 // where: array.where(predicate) -> filtered array
-pub fn where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
-    let result: Vec<Primitive> = arr.iter()
+yaql_function!("where", where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
+    arr.iter()
         .filter_map(|e| {
-            if crate::lang::truthy(&eval_lambda(lambda, e.clone())) {
+            if crate::lang::truthy(&eval_lambda(&lambda, e.clone())) {
                 Some(e.clone())
             } else {
                 None
             }
         })
-        .collect();
-    Primitive::Array(result)
-}
-yaql_raw_function!("where", where_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+        .collect()
+});
 
 // select: array.select(selector) -> mapped array
-pub fn select_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
-    let result: Vec<Primitive> = arr.iter()
-        .map(|e| eval_lambda(lambda, e.clone()))
-        .collect();
-    Primitive::Array(result)
-}
-yaql_raw_function!("select", select_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("select", select_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
+    arr.iter().map(|e| eval_lambda(&lambda, e.clone())).collect()
+});
 
 // selectMany: array.selectMany(selector) -> flatMap
-pub fn select_many_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let lambda = get_lambda(&args, 1);
-    let constant = args.get(1).cloned();
+yaql_function!("selectMany", select_many_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut result = Vec::new();
     for e in arr {
-        let val = if let Some(l) = lambda {
-            eval_lambda(l, e.clone())
-        } else if let Some(c) = &constant {
-            c.clone()
-        } else {
-            continue;
-        };
-        match val {
+        match eval_lambda(&lambda, e) {
             Primitive::Array(sub) => result.extend(sub),
             other => result.push(other),
         }
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("selectMany", select_many_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
+
+// selectMany with a constant (non-lambda) arg -> flatten the constant for each element
+yaql_function!("selectMany", select_many_constant(arr: Vec<Primitive>, constant: Any) -> Vec<Primitive> {
+    let mut result = Vec::new();
+    for _ in arr {
+        match &constant.0 {
+            Primitive::Array(sub) => result.extend(sub.iter().cloned()),
+            other => result.push(other.clone()),
+        }
+    }
+    result
+});
 
 // orderBy: array.orderBy(selector) -> sorted array (stores sort keys for thenBy)
-pub fn order_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else {
-        let mut sorted = arr.clone();
-        sorted.sort_by(|a, b| crate::lang::compare(a, b));
-        let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
-        store_sort_keys(keys, vec![false]);
-        return Primitive::Array(sorted);
-    };
+yaql_function!("orderBy", order_by_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let keyed: Vec<(Primitive, Primitive)> = arr.iter()
-        .map(|e| (eval_lambda(lambda, e.clone()), e.clone()))
+        .map(|e| (eval_lambda(&lambda, e.clone()), e.clone()))
         .collect();
     let mut indices: Vec<usize> = (0..keyed.len()).collect();
     indices.sort_by(|&a, &b| crate::lang::compare(&keyed[a].0, &keyed[b].0));
     let sorted: Vec<Primitive> = indices.iter().map(|&i| keyed[i].1.clone()).collect();
     let sort_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| vec![keyed[i].0.clone()]).collect();
     store_sort_keys(sort_keys, vec![false]);
-    Primitive::Array(sorted)
-}
-yaql_raw_function!("orderBy", order_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    sorted
+});
+
+// orderBy without selector -> sort directly (key = element itself)
+yaql_function!("orderBy", order_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+    let mut sorted = arr;
+    sorted.sort_by(|a, b| crate::lang::compare(a, b));
+    let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
+    store_sort_keys(keys, vec![false]);
+    sorted
+});
 
 // orderByDescending
-pub fn order_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else {
-        let mut sorted = arr.clone();
-        sorted.sort_by(|a, b| crate::lang::compare(b, a));
-        let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
-        store_sort_keys(keys, vec![true]);
-        return Primitive::Array(sorted);
-    };
+yaql_function!("orderByDescending", order_by_desc_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let keyed: Vec<(Primitive, Primitive)> = arr.iter()
-        .map(|e| (eval_lambda(lambda, e.clone()), e.clone()))
+        .map(|e| (eval_lambda(&lambda, e.clone()), e.clone()))
         .collect();
     let mut indices: Vec<usize> = (0..keyed.len()).collect();
     indices.sort_by(|&a, &b| crate::lang::compare(&keyed[b].0, &keyed[a].0));
     let sorted: Vec<Primitive> = indices.iter().map(|&i| keyed[i].1.clone()).collect();
     let sort_keys: Vec<Vec<Primitive>> = indices.iter().map(|&i| vec![keyed[i].0.clone()]).collect();
     store_sort_keys(sort_keys, vec![true]);
-    Primitive::Array(sorted)
-}
-yaql_raw_function!("orderByDescending", order_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    sorted
+});
+
+// orderByDescending without selector -> sort directly descending
+yaql_function!("orderByDescending", order_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+    let mut sorted = arr;
+    sorted.sort_by(|a, b| crate::lang::compare(b, a));
+    let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
+    store_sort_keys(keys, vec![true]);
+    sorted
+});
 
 // thenBy (compound sort: sort by new key, tiebreak by previous keys)
-pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Array(arr.clone()); };
-    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(lambda, e.clone())).collect();
+yaql_function!("thenBy", then_by_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
+    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(&lambda, e.clone())).collect();
     let (prev_keys, prev_desc) = load_sort_keys();
     let has_prev = prev_keys.len() == arr.len();
     let mut indices: Vec<usize> = (0..arr.len()).collect();
@@ -303,14 +292,13 @@ pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
     let mut combined_desc = prev_desc.clone();
     combined_desc.push(false);
     store_sort_keys(combined_keys, combined_desc);
-    Primitive::Array(sorted)
-}
-yaql_raw_function!("thenBy", then_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    sorted
+});
 
-pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Array(arr.clone()); };
-    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(lambda, e.clone())).collect();
+yaql_function!("thenBy", then_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr });
+
+yaql_function!("thenByDescending", then_by_desc_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
+    let new_keys: Vec<Primitive> = arr.iter().map(|e| eval_lambda(&lambda, e.clone())).collect();
     let (prev_keys, prev_desc) = load_sort_keys();
     let has_prev = prev_keys.len() == arr.len();
     let mut indices: Vec<usize> = (0..arr.len()).collect();
@@ -331,11 +319,12 @@ pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)
     let mut combined_desc = prev_desc.clone();
     combined_desc.push(true);
     store_sort_keys(combined_keys, combined_desc);
-    Primitive::Array(sorted)
-}
-yaql_raw_function!("thenByDescending", then_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    sorted
+});
 
-fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[bool]) -> std::cmp::Ordering {
+yaql_function!("thenByDescending", then_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr });
+
+pub fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[bool]) -> std::cmp::Ordering {
     for (i, (ka, kb)) in a.iter().zip(b.iter()).enumerate() {
         let ord = if desc.get(i).copied().unwrap_or(false) {
             crate::lang::compare(kb, ka)
@@ -348,155 +337,153 @@ fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[bool]
 }
 
 // takeWhile
-pub fn take_while_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
+yaql_function!("takeWhile", take_while_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut result = Vec::new();
     for e in arr {
-        if !crate::lang::truthy(&eval_lambda(lambda, e.clone())) { break; }
+        if !crate::lang::truthy(&eval_lambda(&lambda, e.clone())) { break; }
         result.push(e.clone());
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("takeWhile", take_while_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
 
 // skipWhile
-pub fn skip_while_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
+yaql_function!("skipWhile", skip_while_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut skipping = true;
     for e in arr {
-        if skipping && crate::lang::truthy(&eval_lambda(lambda, e.clone())) { continue; }
+        if skipping && crate::lang::truthy(&eval_lambda(&lambda, e.clone())) { continue; }
         skipping = false;
         result.push(e.clone());
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("skipWhile", skip_while_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
 
 // any with predicate
-pub fn any_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Boolean(!arr.is_empty()); };
-    Primitive::Boolean(arr.iter().any(|e| crate::lang::truthy(&eval_lambda(lambda, e.clone()))))
-}
-yaql_raw_function!("any", any_pred_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("any", any_pred_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> bool {
+    arr.iter().any(|e| crate::lang::truthy(&eval_lambda(&lambda, e.clone())))
+});
+
+yaql_function!("any", any_identity(arr: Vec<Primitive>, _any: Any) -> bool {
+    !arr.is_empty()
+});
 
 // all with predicate
-pub fn all_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Boolean(arr.iter().all(crate::lang::truthy)); };
-    Primitive::Boolean(arr.iter().all(|e| crate::lang::truthy(&eval_lambda(lambda, e.clone()))))
-}
-yaql_raw_function!("all", all_pred_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("all", all_pred_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> bool {
+    arr.iter().all(|e| crate::lang::truthy(&eval_lambda(&lambda, e.clone())))
+});
+
+yaql_function!("all", all_identity(arr: Vec<Primitive>, _any: Any) -> bool {
+    arr.iter().all(crate::lang::truthy)
+});
 
 // distinct with selector
-pub fn distinct_sel_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else {
-        let mut seen = Vec::new();
-        for e in arr { crate::lang::sets::set_push_unique(&mut seen, e); }
-        return Primitive::Array(seen);
-    };
+yaql_function!("distinct", distinct_sel_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut seen_keys = Vec::new();
     let mut result = Vec::new();
     for e in arr {
-        let key = eval_lambda(lambda, e.clone());
+        let key = eval_lambda(&lambda, e.clone());
         if !seen_keys.iter().any(|k| crate::lang::primitive_eq(k, &key)) {
             seen_keys.push(key);
             result.push(e.clone());
         }
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("distinct", distinct_sel_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
+
+yaql_function!("distinct", distinct_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+    let mut seen = Vec::new();
+    for e in arr {
+        crate::lang::sets::set_push_unique(&mut seen, &e);
+    }
+    seen
+});
 
 // indexWhere
-pub fn index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Int(-1); };
-    for (i, e) in arr.iter().enumerate() {
-        if crate::lang::truthy(&eval_lambda(lambda, e.clone())) {
-            return Primitive::Int(i as i64);
-        }
-    }
-    Primitive::Int(-1)
-}
-yaql_raw_function!("indexWhere", index_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("indexWhere", index_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> i64 {
+    arr.iter().position(|e| crate::lang::truthy(&eval_lambda(&lambda, e.clone())))
+        .map(|i| i as i64)
+        .unwrap_or(-1)
+});
+
+yaql_function!("indexWhere", index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 });
 
 // lastIndexWhere
-pub fn last_index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Int(-1); };
-    for (i, e) in arr.iter().enumerate().rev() {
-        if crate::lang::truthy(&eval_lambda(lambda, e.clone())) {
-            return Primitive::Int(i as i64);
-        }
-    }
-    Primitive::Int(-1)
-}
-yaql_raw_function!("lastIndexWhere", last_index_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+yaql_function!("lastIndexWhere", last_index_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> i64 {
+    arr.iter().rposition(|e| crate::lang::truthy(&eval_lambda(&lambda, e.clone())))
+        .map(|i| i as i64)
+        .unwrap_or(-1)
+});
+
+yaql_function!("lastIndexWhere", last_index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 });
 
 // aggregate: array.aggregate(func) or array.aggregate(func, init)
-pub fn aggregate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
+yaql_function!("aggregate", aggregate_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Primitive {
     if arr.is_empty() { return Primitive::Null; }
     let mut acc = arr[0].clone();
     for e in &arr[1..] {
-        acc = eval_lambda_2arg(lambda, acc, e.clone());
+        acc = eval_lambda_2arg(&lambda, acc, e.clone());
     }
     acc
-}
-yaql_raw_function!("aggregate", aggregate_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+});
 
-pub fn aggregate_init_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
-    let init = args.get(2).cloned().unwrap_or(Primitive::Null);
-    if arr.is_empty() { return init; }
-    let mut acc = init;
+yaql_function!("aggregate", aggregate_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Primitive {
+    if arr.is_empty() { return init.0; }
+    let mut acc = init.0;
     for e in arr {
-        acc = eval_lambda_2arg(lambda, acc, e.clone());
+        acc = eval_lambda_2arg(&lambda, acc, e.clone());
     }
     acc
-}
-yaql_raw_function!("aggregate", aggregate_init_fn, ArgSpec::Exact(3), [Type::Array, Type::Any, Type::Any], false);
+});
 
 // reduce (same as aggregate)
-yaql_raw_function!("reduce", aggregate_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
-yaql_raw_function!("reduce", aggregate_init_fn, ArgSpec::Exact(3), [Type::Array, Type::Any, Type::Any], false);
+yaql_function!("reduce", reduce_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Primitive {
+    if arr.is_empty() { return Primitive::Null; }
+    let mut acc = arr[0].clone();
+    for e in &arr[1..] {
+        acc = eval_lambda_2arg(&lambda, acc, e.clone());
+    }
+    acc
+});
+
+yaql_function!("reduce", reduce_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Primitive {
+    if arr.is_empty() { return init.0; }
+    let mut acc = init.0;
+    for e in arr {
+        acc = eval_lambda_2arg(&lambda, acc, e.clone());
+    }
+    acc
+});
 
 // accumulate
-pub fn accumulate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
-    if arr.is_empty() { return Primitive::Array(vec![]); }
-    let mut result = Vec::new();
-    let mut acc = arr[0].clone();
-    result.push(acc.clone());
-    for e in &arr[1..] {
-        acc = eval_lambda_2arg(lambda, acc, e.clone());
+yaql_function!("accumulate", accumulate_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
+    if arr.is_empty() {
+        Vec::new()
+    } else {
+        let mut result = Vec::new();
+        let mut acc = arr[0].clone();
         result.push(acc.clone());
+        for e in &arr[1..] {
+            acc = eval_lambda_2arg(&lambda, acc, e.clone());
+            result.push(acc.clone());
+        }
+        result
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("accumulate", accumulate_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+});
 
-pub fn accumulate_init_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
-    let init = args.get(2).cloned().unwrap_or(Primitive::Null);
-    let mut result = vec![init.clone()];
-    let mut acc = init;
-    for e in arr {
-        acc = eval_lambda_2arg(lambda, acc, e.clone());
+yaql_function!("accumulate", accumulate_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Vec<Primitive> {
+    if arr.is_empty() {
+        vec![init.0]
+    } else {
+        let mut result = Vec::new();
+        let mut acc = init.0;
         result.push(acc.clone());
+        for e in arr {
+            acc = eval_lambda_2arg(&lambda, acc, e.clone());
+            result.push(acc.clone());
+        }
+        result
     }
-    Primitive::Array(result)
-}
-yaql_raw_function!("accumulate", accumulate_init_fn, ArgSpec::Exact(3), [Type::Array, Type::Any, Type::Any], false);
+});
 
 // toDict: array.toDict(keyFunc, valueFunc) -> Map
 pub fn to_dict_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
@@ -520,7 +507,7 @@ pub fn to_dict_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
 yaql_raw_function!("toDict", to_dict_fn, ArgSpec::Min(2), [Type::Array, Type::Any], false);
 
 // Evaluate a 2-arg lambda ($1 = acc, $2 = element, $ = element)
-fn eval_lambda_2arg(lambda: &LambdaBody, acc: Primitive, element: Primitive) -> Primitive {
+pub fn eval_lambda_2arg(lambda: &LambdaBody, acc: Primitive, element: Primitive) -> Primitive {
     let mut interp = crate::interpreter::Interpreter { contexts: lambda.env.clone(), current_func: None };
     let elem_clone = element.clone();
     interp.push_context(element);
@@ -529,13 +516,11 @@ fn eval_lambda_2arg(lambda: &LambdaBody, acc: Primitive, element: Primitive) -> 
 }
 
 // --- splitWhere: split at positions where predicate is true ---
-pub fn split_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
+yaql_function!("splitWhere", split_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut current = Vec::new();
     for e in arr {
-        if crate::lang::truthy(&eval_lambda(lambda, e.clone())) {
+        if crate::lang::truthy(&eval_lambda(&lambda, e.clone())) {
             result.push(Primitive::Array(current));
             current = Vec::new();
         } else {
@@ -543,19 +528,16 @@ pub fn split_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
         }
     }
     result.push(Primitive::Array(current));
-    Primitive::Array(result)
-}
-yaql_raw_function!("splitWhere", split_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
 
 // --- sliceWhere: group consecutive elements by predicate result ---
-pub fn slice_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Array(arr) = &args[0] else { return Primitive::Null };
-    let Some(lambda) = get_lambda(&args, 1) else { return Primitive::Null };
+yaql_function!("sliceWhere", slice_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut current = Vec::new();
     let mut last_pred: Option<bool> = None;
     for e in arr {
-        let pred = crate::lang::truthy(&eval_lambda(lambda, e.clone()));
+        let pred = crate::lang::truthy(&eval_lambda(&lambda, e.clone()));
         if last_pred.is_some() && last_pred != Some(pred) {
             result.push(Primitive::Array(current));
             current = Vec::new();
@@ -564,9 +546,8 @@ pub fn slice_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
         last_pred = Some(pred);
     }
     if !current.is_empty() { result.push(Primitive::Array(current)); }
-    Primitive::Array(result)
-}
-yaql_raw_function!("sliceWhere", slice_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Any], false);
+    result
+});
 
 // --- zip ---
 pub fn zip_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {

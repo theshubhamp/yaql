@@ -1,5 +1,8 @@
 pub use crate::lang::primitive::Primitive;
 pub use crate::lang::primitive::RegexWrapper;
+pub use crate::lang::primitive::LambdaBody;
+pub use crate::interpreter::eval_lambda;
+pub use crate::lang::query::{store_sort_keys, load_sort_keys, compare_key_vectors_with_desc, eval_lambda_2arg};
 pub use std::collections::HashMap;
 
 pub type Function = fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Primitive;
@@ -124,6 +127,13 @@ impl FromPrimitive for RegexWrapper {
     const TYPE: Type = Type::Regex;
     fn from_primitive(p: &Primitive) -> Option<Self> {
         if let Primitive::Regex(r) = p { Some(r.clone()) } else { None }
+    }
+}
+
+impl FromPrimitive for crate::lang::primitive::LambdaBody {
+    const TYPE: Type = Type::Lambda;
+    fn from_primitive(p: &Primitive) -> Option<Self> {
+        if let Primitive::Lambda(l) = p { Some(l.clone()) } else { None }
     }
 }
 
