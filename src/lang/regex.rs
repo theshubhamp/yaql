@@ -13,8 +13,8 @@ fn build_regex(pattern: &str, ignore_case: bool) -> Option<RegexWrapper> {
 }
 
 // regex(pattern) and regex(pattern, ignoreCase => bool)
-pub fn regex_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(pattern) = &args[0] else { return Primitive::Null };
+pub fn regex_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(pattern) = &args[0] else { return Ok(Primitive::Null) };
     let ignore_case = kwargs.iter().find_map(|(k, v)| {
         if let Primitive::String(key) = k {
             if key == "ignoreCase" {
@@ -24,8 +24,8 @@ pub fn regex_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Pr
         None
     }).unwrap_or(false);
     match build_regex(pattern, ignore_case) {
-        Some(r) => Primitive::Regex(r),
-        None => Primitive::Null,
+        Some(r) => Ok(Primitive::Regex(r)),
+        None => Ok(Primitive::Null),
     }
 }
 yaql_raw_function!("regex", regex_fn, ArgSpec::Min(1), [Type::String], true);
@@ -58,16 +58,16 @@ yaql_function!("matches", str_matches(s: String, pattern: String) -> Option<bool
 // --- search ---
 // regex.search(string) -> string | null  (first full match value)
 // regex.search(string, selector) -> selector applied to match object
-pub fn regex_search_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+pub fn regex_search_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
     let m = match re.0.find(&s) {
         Some(m) => m,
-        None => return Primitive::Null,
+        None => return Ok(Primitive::Null),
     };
     let captures = re.0.captures(&s);
     if args.len() == 2 {
-        return Primitive::String(m.as_str().to_string());
+        return Ok(Primitive::String(m.as_str().to_string()));
     }
     // With selector — but we don't have lambda support, so only handle $ / $N / $.field
     let selector = &args[2];
@@ -78,9 +78,9 @@ yaql_raw_function!("search", regex_search_fn, ArgSpec::Min(2), [Type::Regex, Typ
 // --- searchAll ---
 // regex.searchAll(string) -> array of strings
 // regex.searchAll(string, selector) -> array of selector results
-pub fn regex_search_all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+pub fn regex_search_all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
     let has_selector = args.len() > 2;
     let mut results = Vec::new();
     for m in re.0.find_iter(&s) {
@@ -89,19 +89,19 @@ pub fn regex_search_all_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primit
             continue;
         }
         let captures = re.0.captures_at(&s, m.start());
-        let r = apply_selector(&args[2], &m, captures.as_ref(), s);
+        let r = apply_selector(&args[2], &m, captures.as_ref(), s)?;
         results.push(r);
     }
-    Primitive::Array(results)
+    Ok(Primitive::Array(results))
 }
 yaql_raw_function!("searchAll", regex_search_all_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
 
 // --- split ---
 // regex.split(string) -> array
 // regex.split(string, maxsplit) -> array
-pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
+pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
     let maxsplit = if args.len() > 2 {
         if let Primitive::Int(n) = &args[2] { Some(*n as usize) } else { None }
     } else { None };
@@ -118,9 +118,9 @@ pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
         } else {
             split_captures(&re.0, s)
         };
-        return Primitive::Array(parts);
+        return Ok(Primitive::Array(parts));
     }
-    Primitive::Array(parts)
+    Ok(Primitive::Array(parts))
 }
 yaql_raw_function!("split", regex_split_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
 
@@ -136,64 +136,64 @@ yaql_function!("split", str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<P
 // --- replace ---
 // regex.replace(string, replacement) -> string
 // regex.replace(string, replacement, count) -> string
-pub fn regex_replace_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
-    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+pub fn regex_replace_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::String(replacement) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
     let result = apply_backrefs(&re.0, s, replacement, count);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replace", regex_replace_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::String], false);
 
 // string.replace(regex, replacement) -> string
 // string.replace(regex, replacement, count) -> string
-pub fn str_replace_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
-    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+pub fn str_replace_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::Regex(re) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::String(replacement) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
     let result = apply_backrefs(&re.0, s, replacement, count);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replace", str_replace_regex_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::String], false);
 
 // --- replaceBy (without lambda, only string replacement) ---
 // regex.replaceBy(string, replacement) -> string
 // regex.replaceBy(string, replacement, count) -> string
-pub fn regex_replace_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
-    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+pub fn regex_replace_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::String(replacement) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
     let result = apply_backrefs(&re.0, s, replacement, count);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replaceBy", regex_replace_by_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::String], false);
 
-pub fn str_replace_by_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
-    let Primitive::String(replacement) = &args[2] else { return Primitive::Null };
+pub fn str_replace_by_regex_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::Regex(re) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::String(replacement) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
     let result = apply_backrefs(&re.0, s, replacement, count);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replaceBy", str_replace_by_regex_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::String], false);
 
 // --- replaceBy (lambda: replacement is a lambda called with match object) ---
-pub fn regex_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Regex(re) = &args[0] else { return Primitive::Null };
-    let Primitive::String(s) = &args[1] else { return Primitive::Null };
-    let Primitive::Lambda(lambda) = &args[2] else { return Primitive::Null };
+pub fn regex_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Regex(re) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::String(s) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::Lambda(lambda) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
@@ -211,20 +211,20 @@ pub fn regex_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive,
         let mut interp = crate::interpreter::Interpreter { contexts: (*lambda.env).clone(), current_func: None };
         interp.push_context(Primitive::Array(groups));
         interp.push_context(match_obj);
-        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
+        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body)?;
         if let Primitive::String(r) = replacement { result.push_str(&r); }
         last_end = m.end();
         matched += 1;
     }
     result.push_str(&s[last_end..]);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replaceBy", regex_replace_by_lambda_fn, ArgSpec::Min(3), [Type::Regex, Type::String, Type::Lambda], false);
 
-pub fn str_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
-    let Primitive::Regex(re) = &args[1] else { return Primitive::Null };
-    let Primitive::Lambda(lambda) = &args[2] else { return Primitive::Null };
+pub fn str_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
+    let Primitive::Regex(re) = &args[1] else { return Ok(Primitive::Null) };
+    let Primitive::Lambda(lambda) = &args[2] else { return Ok(Primitive::Null) };
     let count = if args.len() > 3 {
         if let Primitive::Int(n) = &args[3] { Some(*n as usize) } else { None }
     } else { None };
@@ -242,13 +242,13 @@ pub fn str_replace_by_lambda_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, P
         let mut interp = crate::interpreter::Interpreter { contexts: (*lambda.env).clone(), current_func: None };
         interp.push_context(Primitive::Array(groups));
         interp.push_context(match_obj);
-        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body);
+        let replacement = crate::interpreter::eval_body(&mut interp, &lambda.body)?;
         if let Primitive::String(r) = replacement { result.push_str(&r); }
         last_end = m.end();
         matched += 1;
     }
     result.push_str(&s[last_end..]);
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replaceBy", str_replace_by_lambda_fn, ArgSpec::Min(3), [Type::String, Type::Regex, Type::Lambda], false);
 
@@ -267,10 +267,10 @@ fn capture_to_map(cap: &regex::Captures, idx: usize, s: &str) -> Primitive {
     }
 }
 
-fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&regex::Captures>, s: &str) -> Primitive {
+fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&regex::Captures>, s: &str) -> Result<Primitive, crate::lang::functions::EvalError> {
     use crate::interpreter::Interpreter;
     let Primitive::Lambda(lambda) = selector else {
-        return Primitive::String(m.as_str().to_string());
+        return Ok(Primitive::String(m.as_str().to_string()));
     };
     // Build context: push match object as $, and capture groups array for $1/$2
     let match_obj = match_to_map(m, s);

@@ -37,14 +37,14 @@ yaql_function!("containsKey", contains_key_any(m: HashMap<String, Primitive>, _k
     false
 });
 
-pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    Primitive::Array(args)
+pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    Ok(Primitive::Array(args))
 }
 yaql_raw_function!("list", list_fn, ArgSpec::Varargs, [], false);
 
 yaql_function!("toList", to_list_fn(a: Vec<Primitive>) -> Vec<Primitive> { a });
 
-pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
     let mut map = HashMap::new();
     let pairs: Vec<Primitive> = if args.len() == 1 {
         if let Primitive::Array(a) = &args[0] { a.clone() } else { args }
@@ -73,22 +73,22 @@ pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Pri
         };
         map.insert(key, v);
     }
-    Primitive::Map(map)
+    Ok(Primitive::Map(map))
 }
 yaql_raw_function!("dict", dict_fn, ArgSpec::Varargs, [], true);
 
-pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
     if args.len() <= 1 && kwargs.is_empty() {
         return crate::lang::sets::set_fn(args, kwargs);
     }
-    let Primitive::Map(mut m) = args[0].clone() else { return Primitive::Null };
+    let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
     if args.len() == 3 {
         let key = match &args[1] {
             Primitive::String(s) => s.clone(),
             Primitive::Int(n) => n.to_string(),
             Primitive::Boolean(b) => b.to_string(),
             Primitive::Null => "null".to_string(),
-            _ => return Primitive::Null,
+            _ => return Ok(Primitive::Null),
         };
         m.insert(key, args[2].clone());
     } else if args.len() == 2 {
@@ -108,12 +108,12 @@ pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) ->
         };
         m.insert(key, v);
     }
-    Primitive::Map(m)
+    Ok(Primitive::Map(m))
 }
 yaql_raw_function!("set", dict_set_fn, ArgSpec::Min(1), [Type::Map], true);
 
-pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Map(mut m) = args[0].clone() else { return Primitive::Null };
+pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
     for arg in &args[1..] {
         let key = match arg {
             Primitive::String(s) => s.clone(),
@@ -124,7 +124,7 @@ pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
         };
         m.remove(&key);
     }
-    Primitive::Map(m)
+    Ok(Primitive::Map(m))
 }
 yaql_raw_function!("delete", dict_delete_fn, ArgSpec::Min(2), [Type::Map], false);
 
@@ -163,19 +163,19 @@ pub fn max_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    max_impl(args)
+pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    Ok(max_impl(args))
 }
 yaql_raw_function!("max", max_varargs, ArgSpec::Min(1), [Type::Any], false);
 
 yaql_function!("max", max_arr(arr: Vec<Primitive>) -> Primitive { crate::lang::collections::max_impl(arr) });
 yaql_function!("max", max_set(arr: SetVec) -> Primitive { crate::lang::collections::max_impl(arr.0) });
 yaql_function!("max", max_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
-    if arr.is_empty() { return default.0 }
+    if arr.is_empty() { return Ok(default.0) }
     crate::lang::collections::max_impl(arr)
 });
 yaql_function!("max", max_set_default(arr: SetVec, default: Any) -> Primitive {
-    if arr.0.is_empty() { return default.0 }
+    if arr.0.is_empty() { return Ok(default.0) }
     crate::lang::collections::max_impl(arr.0)
 });
 
@@ -192,19 +192,19 @@ pub fn min_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    min_impl(args)
+pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    Ok(min_impl(args))
 }
 yaql_raw_function!("min", min_varargs, ArgSpec::Min(1), [Type::Any], false);
 
 yaql_function!("min", min_arr(arr: Vec<Primitive>) -> Primitive { crate::lang::collections::min_impl(arr) });
 yaql_function!("min", min_set(arr: SetVec) -> Primitive { crate::lang::collections::min_impl(arr.0) });
 yaql_function!("min", min_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
-    if arr.is_empty() { return default.0 }
+    if arr.is_empty() { return Ok(default.0) }
     crate::lang::collections::min_impl(arr)
 });
 yaql_function!("min", min_set_default(arr: SetVec, default: Any) -> Primitive {
-    if arr.0.is_empty() { return default.0 }
+    if arr.0.is_empty() { return Ok(default.0) }
     crate::lang::collections::min_impl(arr.0)
 });
 

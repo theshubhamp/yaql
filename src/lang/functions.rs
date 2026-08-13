@@ -5,7 +5,22 @@ pub use crate::interpreter::eval_lambda;
 pub use crate::lang::query::{store_sort_keys, load_sort_keys, compare_key_vectors_with_desc, eval_lambda_2arg};
 pub use std::collections::HashMap;
 
-pub type Function = fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Primitive;
+#[derive(Debug, Clone)]
+pub struct EvalError(pub String);
+
+impl EvalError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        EvalError(msg.into())
+    }
+}
+
+impl std::fmt::Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub type Function = fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError>;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Type {
@@ -236,9 +251,9 @@ macro_rules! yaql_function {
         mod $name {
             use crate::lang::functions::*;
             pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(0), &[], false);
-            pub fn func(_args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+            pub fn func(_args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 let __ret: $ret = $body;
-                IntoPrimitive::into_primitive(__ret)
+                Ok(IntoPrimitive::into_primitive(__ret))
             }
         }
         inventory::submit! { $name::SPEC }
@@ -247,12 +262,12 @@ macro_rules! yaql_function {
         mod $name {
             use crate::lang::functions::*;
             pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(1), &[<$t0 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let __ret: $ret = $body;
-                IntoPrimitive::into_primitive(__ret)
+                Ok(IntoPrimitive::into_primitive(__ret))
             }
         }
         inventory::submit! { $name::SPEC }
@@ -261,15 +276,15 @@ macro_rules! yaql_function {
         mod $name {
             use crate::lang::functions::*;
             pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(2), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let __ret: $ret = $body;
-                IntoPrimitive::into_primitive(__ret)
+                Ok(IntoPrimitive::into_primitive(__ret))
             }
         }
         inventory::submit! { $name::SPEC }
@@ -278,18 +293,18 @@ macro_rules! yaql_function {
         mod $name {
             use crate::lang::functions::*;
             pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(3), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE, <$t2 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let __ret: $ret = $body;
-                IntoPrimitive::into_primitive(__ret)
+                Ok(IntoPrimitive::into_primitive(__ret))
             }
         }
         inventory::submit! { $name::SPEC }
@@ -298,21 +313,21 @@ macro_rules! yaql_function {
         mod $name {
             use crate::lang::functions::*;
             pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(4), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE, <$t2 as FromPrimitive>::TYPE, <$t3 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let $p3 = match <$t3 as FromPrimitive>::from_primitive(&args[3]) {
-                    Some(v) => v, None => return Primitive::Null,
+                    Some(v) => v, None => return Ok(Primitive::Null),
                 };
                 let __ret: $ret = $body;
-                IntoPrimitive::into_primitive(__ret)
+                Ok(IntoPrimitive::into_primitive(__ret))
             }
         }
         inventory::submit! { $name::SPEC }

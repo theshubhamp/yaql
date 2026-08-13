@@ -121,8 +121,8 @@ yaql_function!("replace", replace_str_4(s: String, old: String, new: String, cou
     if old.is_empty() { s } else { s.replacen(old.as_str(), new.as_str(), count as usize) }
 });
 
-pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Null };
+pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
     let count = if args.len() > 2 {
         if let Primitive::Int(c) = &args[2] { Some(*c) } else { None }
     } else { None };
@@ -140,15 +140,15 @@ pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -
     } else { None };
 
     if dict.is_none() {
-        let Primitive::String(old) = &args[1] else { return Primitive::String(s.clone()); };
-        let Primitive::String(new) = &args[2] else { return Primitive::String(s.clone()); };
-        if old.is_empty() { return Primitive::String(s.clone()); }
+        let Primitive::String(old) = &args[1] else { return Ok(Primitive::String(s.clone())); };
+        let Primitive::String(new) = &args[2] else { return Ok(Primitive::String(s.clone())); };
+        if old.is_empty() { return Ok(Primitive::String(s.clone())); }
         let result = if let Some(c) = count {
             s.replacen(old.as_str(), new.as_str(), c as usize)
         } else {
             s.replace(old.as_str(), new.as_str())
         };
-        return Primitive::String(result);
+        return Ok(Primitive::String(result));
     }
 
     let mut result = s.clone();
@@ -163,7 +163,7 @@ pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -
             };
         }
     }
-    Primitive::String(result)
+    Ok(Primitive::String(result))
 }
 yaql_raw_function!("replace", replace_dict, ArgSpec::Min(1), [Type::String], true);
 
@@ -279,20 +279,20 @@ yaql_function!("lastIndexOf", last_index_of_4(s: String, needle: String, start: 
 
 // --- startsWith / endsWith with varargs ---
 
-pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Boolean(false) };
+pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
         if let Primitive::String(prefix) = p { s.starts_with(prefix.as_str()) } else { false }
     });
-    Primitive::Boolean(result)
+    Ok(Primitive::Boolean(result))
 }
 yaql_raw_function!("startsWith", starts_with_varargs, ArgSpec::Min(2), [Type::String], false);
 
-pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::String(s) = &args[0] else { return Primitive::Boolean(false) };
+pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
         if let Primitive::String(suffix) = p { s.ends_with(suffix.as_str()) } else { false }
     });
-    Primitive::Boolean(result)
+    Ok(Primitive::Boolean(result))
 }
 yaql_raw_function!("endsWith", ends_with_varargs, ArgSpec::Min(2), [Type::String], false);

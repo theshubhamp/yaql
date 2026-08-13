@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::lang::{truthy, ArgSpec, FUNCTIONS, Primitive, Spec};
+use crate::lang::functions::EvalError;
 use crate::lang::primitive::LambdaBody;
 use std::sync::Arc;
 
@@ -62,107 +63,107 @@ impl Interpreter {
 
 /// Free function to evaluate a lambda with a given argument.
 /// Used by functions that receive Primitive::Lambda as an argument.
-pub fn eval_lambda(lambda: &LambdaBody, arg: Primitive) -> Primitive {
+pub fn eval_lambda(lambda: &LambdaBody, arg: Primitive) -> Result<Primitive, EvalError> {
     let mut interp = Interpreter { contexts: (*lambda.env).clone(), current_func: None };
     interp.push_context(arg);
     eval_body(&mut interp, &lambda.body)
 }
 
 /// Auto-call a lambda at top level — don't push a new context, just use the env.
-pub fn eval_lambda_auto(lambda: &LambdaBody) -> Primitive {
+pub fn eval_lambda_auto(lambda: &LambdaBody) -> Result<Primitive, EvalError> {
     let mut interp = Interpreter { contexts: (*lambda.env).clone(), current_func: None };
     eval_body(&mut interp, &lambda.body)
 }
 
-pub fn eval_body(interp: &mut Interpreter, body: &Value) -> Primitive {
+pub fn eval_body(interp: &mut Interpreter, body: &Value) -> Result<Primitive, EvalError> {
     match body {
         Value::Lambda(left, right) => {
-            let env_val = interp.visit(left).unwrap_or(Primitive::Null);
+            let env_val = interp.visit(left)?;
             interp.push_context(env_val);
             eval_body(interp, right)
         }
-        other => interp.visit(other).unwrap_or(Primitive::Null),
+        other => interp.visit(other),
     }
 }
 
 impl Interpreter {
     /// Evaluate a `Value` AST node. Takes `&Value` so the lambda hot path can
     /// evaluate a body repeatedly without cloning the AST on every element.
-    pub fn visit(&mut self, value: &Value) -> Option<Primitive> {
+    pub fn visit(&mut self, value: &Value) -> Result<Primitive, EvalError> {
         match value {
-            Value::StringLiteral(string) => Some(Primitive::String(unquote(string))),
-            Value::IntLiteral(num) => Some(Primitive::Int(*num)),
-            Value::FloatLiteral(num) => Some(Primitive::Float(*num)),
-            Value::BooleanLiteral(b) => Some(Primitive::Boolean(*b)),
-            Value::NullLiteral => Some(Primitive::Null),
+            Value::StringLiteral(string) => Ok(Primitive::String(unquote(string))),
+            Value::IntLiteral(num) => Ok(Primitive::Int(*num)),
+            Value::FloatLiteral(num) => Ok(Primitive::Float(*num)),
+            Value::BooleanLiteral(b) => Ok(Primitive::Boolean(*b)),
+            Value::NullLiteral => Ok(Primitive::Null),
             Value::Dollar(path) => {
-                self.dollar_lookup(path)
+                Ok(self.dollar_lookup(path).unwrap_or(Primitive::Null))
             }
             Value::Lambda(left, right) => {
-                Primitive::Lambda(LambdaBody {
+                Ok(Primitive::Lambda(LambdaBody {
                     body: Box::new(Value::Lambda(left.clone(), right.clone())),
                     env: Arc::new(self.contexts.clone()),
-                }).into()
+                }))
             }
             Value::FunctionCall(identifier, args, kwargs) => {
                 self.current_func = Some(identifier.clone());
                 let overloads = FUNCTIONS.lookup(identifier);
-                let arg_values = self.eval_args(args, true);
-                let kwarg_values = self.eval_kwargs(kwargs);
+                let arg_values = self.eval_args(args, true)?;
+                let kwarg_values = self.eval_kwargs(kwargs)?;
                 self.current_func = None;
-                Some(dispatch(overloads, arg_values, kwarg_values))
+                dispatch(overloads, arg_values, kwarg_values)
             }
             Value::BinaryOperator(left, op, right) => {
                 match op.as_str() {
                     "and" => {
                         let left_value = self.visit(left)?;
-                        if !truthy(&left_value) { return Some(left_value); }
+                        if !truthy(&left_value) { return Ok(left_value); }
                         self.visit(right)
                     }
                     "or" => {
                         let left_value = self.visit(left)?;
-                        if truthy(&left_value) { return Some(left_value); }
+                        if truthy(&left_value) { return Ok(left_value); }
                         self.visit(right)
                     }
                     _ => {
                         let left_value = self.visit(left)?;
                         let right_value = self.visit(right)?;
-                        Some(dispatch(FUNCTIONS.lookup(op), vec![left_value, right_value], vec![]))
+                        dispatch(FUNCTIONS.lookup(op), vec![left_value, right_value], vec![])
                     }
                 }
             }
             Value::UnaryOperator(op, operand) => {
                 let val = self.visit(operand)?;
                 match op.as_str() {
-                    "not" => Some(Primitive::Boolean(!truthy(&val))),
+                    "not" => Ok(Primitive::Boolean(!truthy(&val))),
                     "-" => match val {
-                        Primitive::Int(n) => Some(Primitive::Int(-n)),
-                        Primitive::Float(n) => Some(Primitive::Float(-n)),
-                        _ => None,
+                        Primitive::Int(n) => Ok(Primitive::Int(-n)),
+                        Primitive::Float(n) => Ok(Primitive::Float(-n)),
+                        _ => Ok(Primitive::Null),
                     },
-                    "+" => Some(val),
-                    _ => None,
+                    "+" => Ok(val),
+                    _ => Ok(Primitive::Null),
                 }
             }
             Value::MethodCall(receiver, optional, method, args, kwargs) => {
                 let receiver_value = self.visit(receiver)?;
                 if *optional && matches!(receiver_value, Primitive::Null) {
-                    return Some(Primitive::Null);
+                    return Ok(Primitive::Null);
                 }
                 self.current_func = Some(method.clone());
                 let overloads = FUNCTIONS.lookup(method);
                 let mut arg_values = vec![receiver_value];
-                arg_values.extend(self.eval_args(args, false));
-                let kwarg_values = self.eval_kwargs(kwargs);
+                arg_values.extend(self.eval_args(args, false)?);
+                let kwarg_values = self.eval_kwargs(kwargs)?;
                 self.current_func = None;
-                Some(dispatch(overloads, arg_values, kwarg_values))
+                dispatch(overloads, arg_values, kwarg_values)
             }
             Value::List(elements) => {
                 let mut items = Vec::new();
                 for e in elements {
                     items.push(self.visit(e)?);
                 }
-                Some(Primitive::Array(items))
+                Ok(Primitive::Array(items))
             }
             Value::Dict(entries) => {
                 let mut map = std::collections::HashMap::new();
@@ -176,7 +177,7 @@ impl Interpreter {
                     };
                     map.insert(key, self.visit(v)?);
                 }
-                Some(Primitive::Map(map))
+                Ok(Primitive::Map(map))
             }
             Value::Index(collection, indices) => {
                 let coll = self.visit(collection)?;
@@ -189,20 +190,23 @@ impl Interpreter {
                             if let Primitive::String(k) = &key {
                                 if let Primitive::Map(map) = &coll {
                                     if let Some(v) = map.get(k) {
-                                        return Some(v.clone());
+                                        return Ok(v.clone());
                                     }
                                 }
                             }
-                            return Some(val);
+                            return Ok(val);
                         }
                         idx_values.push(self.visit(v)?);
                     } else {
                         idx_values.push(self.visit(v)?);
                     }
                 }
-                let idx = idx_values.first()?.clone();
+                let idx = match idx_values.first() {
+                    Some(i) => i.clone(),
+                    None => Primitive::Null,
+                };
                 let default = idx_values.get(1).cloned();
-                match (&coll, &idx) {
+                let result = match (&coll, &idx) {
                     (Primitive::Array(arr), Primitive::Int(i)) => {
                         let len = arr.len() as i64;
                         let pos = if *i < 0 { *i + len } else { *i };
@@ -216,30 +220,33 @@ impl Interpreter {
                     (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().or(default),
                     (Primitive::Map(map), Primitive::Int(i)) => map.get(&i.to_string()).cloned().or(default),
                     _ => default,
-                }
+                };
+                Ok(result.unwrap_or(Primitive::Null))
             }
         }
     }
 
-    fn eval_args(&mut self, args: &[Value], first_is_collection: bool) -> Vec<Primitive> {
-        args.iter().enumerate().map(|(i, a)| {
+    fn eval_args(&mut self, args: &[Value], first_is_collection: bool) -> Result<Vec<Primitive>, EvalError> {
+        let mut out = Vec::with_capacity(args.len());
+        for (i, a) in args.iter().enumerate() {
             let is_lambda_pos = !first_is_collection || i > 0;
-            self.eval_arg(a, is_lambda_pos)
-        }).collect()
+            out.push(self.eval_arg(a, is_lambda_pos)?);
+        }
+        Ok(out)
     }
 
-    fn eval_kwargs(&mut self, kwargs: &[(Value, Value)]) -> Vec<(Primitive, Primitive)> {
-        kwargs.iter()
-            .filter_map(|(k, v)| {
-                let k = self.visit(k).unwrap_or(Primitive::Null);
-                let v = self.eval_arg(v, true);
-                Some((k, v))
-            })
-            .collect()
+    fn eval_kwargs(&mut self, kwargs: &[(Value, Value)]) -> Result<Vec<(Primitive, Primitive)>, EvalError> {
+        let mut out = Vec::with_capacity(kwargs.len());
+        for (k, v) in kwargs {
+            let k = self.visit(k)?;
+            let v = self.eval_arg(v, true)?;
+            out.push((k, v));
+        }
+        Ok(out)
     }
 
-    fn eval_arg(&mut self, arg: &Value, is_lambda_pos: bool) -> Primitive {
-        match arg {
+    fn eval_arg(&mut self, arg: &Value, is_lambda_pos: bool) -> Result<Primitive, EvalError> {
+        Ok(match arg {
             Value::Lambda(left, right) => {
                 Primitive::Lambda(LambdaBody {
                     body: Box::new(Value::Lambda(left.clone(), right.clone())),
@@ -252,7 +259,7 @@ impl Interpreter {
                     env: Arc::new(self.contexts.clone()),
                 })
             }
-            Value::Dollar(_) => self.visit(arg).unwrap_or(Primitive::Null),
+            Value::Dollar(_) => self.visit(arg)?,
             other if is_lambda_pos && is_lambda_context(&self.current_func)
                 && !is_strict_lambda(&self.current_func)
                 && contains_dollar(other) => {
@@ -268,15 +275,15 @@ impl Interpreter {
                     env: Arc::new(self.contexts.clone()),
                 })
             }
-            other => self.visit(other).unwrap_or(Primitive::Null),
-        }
+            other => self.visit(other)?,
+        })
     }
 
-    pub fn eval_lambda(&mut self, lambda: &LambdaBody, arg: Primitive) -> Primitive {
+    pub fn eval_lambda(&mut self, lambda: &LambdaBody, arg: Primitive) -> Result<Primitive, EvalError> {
         let saved = std::mem::take(&mut self.contexts);
         self.contexts = (*lambda.env).clone();
         self.push_context(arg);
-        let result = self.visit(&lambda.body).unwrap_or(Primitive::Null);
+        let result = self.visit(&lambda.body);
         self.contexts = saved;
         result
     }
@@ -284,7 +291,7 @@ impl Interpreter {
 
 /// Find the best matching overload and call it.
 /// `overloads` is expected to be the pre-sorted list from `FUNCTIONS.lookup`.
-pub(crate) fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+pub(crate) fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let typed: Vec<&Spec> = overloads.iter().filter(|s| !s.arg_types.is_empty()).collect();
     let untyped: Vec<&Spec> = overloads.iter().filter(|s| s.arg_types.is_empty()).collect();
     let ordered: Vec<&Spec> = typed.into_iter().chain(untyped.into_iter()).collect();
@@ -316,7 +323,7 @@ pub(crate) fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Pr
         }
         return (spec.func)(args, kwargs);
     }
-    Primitive::Null
+    Ok(Primitive::Null)
 }
 
 fn unquote(raw: &str) -> String {

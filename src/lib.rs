@@ -34,16 +34,19 @@ pub fn evaluate_with(expr: &str, context: Primitive) -> EvalResult {
     };
     let mut interpreter = Interpreter::new(context);
     match interpreter.visit(&ast) {
-        Some(value) => {
+        Ok(value) => {
             // Auto-call top-level lambdas (e.g. `with(5) -> $ + 1`)
             if let Primitive::Lambda(ref lambda) = value {
                 // For auto-call: push the last env context (e.g. `with(5)` or `let(...)` result)
                 // which is already in the env. Don't push a new context.
-                crate::interpreter::eval_lambda_auto(lambda).into()
+                match crate::interpreter::eval_lambda_auto(lambda) {
+                    Ok(v) => EvalResult::Value(v),
+                    Err(e) => EvalResult::EvalError(e.to_string()),
+                }
             } else {
                 EvalResult::Value(value)
             }
         }
-        None => EvalResult::EvalError("evaluation returned None".to_string()),
+        Err(e) => EvalResult::EvalError(e.to_string()),
     }
 }

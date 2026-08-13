@@ -32,12 +32,12 @@ pub fn set_symmetric_difference(a: &[Primitive], b: &[Primitive]) -> Vec<Primiti
     result
 }
 
-pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
+pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
     let mut seen = Vec::new();
     for arg in args {
         set_push_unique(&mut seen, &arg);
     }
-    Primitive::Set(seen)
+    Ok(Primitive::Set(seen))
 }
 yaql_raw_function!("set", set_fn, ArgSpec::Varargs, [], false);
 
@@ -67,23 +67,23 @@ yaql_function!("symmetricDifference", symdiff_sa(l: SetVec, r: Vec<Primitive>) -
     SetVec(crate::lang::sets::set_symmetric_difference(&l.0, &r))
 });
 
-pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Set(mut elems) = args[0].clone() else { return Primitive::Null };
+pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Set(mut elems) = args[0].clone() else { return Ok(Primitive::Null) };
     for arg in &args[1..] {
         set_push_unique(&mut elems, arg);
     }
-    Primitive::Set(elems)
+    Ok(Primitive::Set(elems))
 }
 yaql_raw_function!("add", set_add, ArgSpec::Min(2), [Type::Set], false);
 
-pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Primitive {
-    let Primitive::Set(elems) = &args[0] else { return Primitive::Null };
+pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Set(elems) = &args[0] else { return Ok(Primitive::Null) };
     let to_remove = &args[1..];
     let result: Vec<Primitive> = elems.iter()
         .filter(|e| !to_remove.iter().any(|r| primitive_eq(e, r)))
         .cloned()
         .collect();
-    Primitive::Set(result)
+    Ok(Primitive::Set(result))
 }
 yaql_raw_function!("remove", set_remove, ArgSpec::Min(2), [Type::Set], false);
 

@@ -1,5 +1,7 @@
 use crate::lang::primitive::Primitive;
+use crate::lang::functions::{ArgSpec, Type};
 use crate::yaql_function;
+use crate::yaql_raw_function;
 
 // --- Internal helpers (used by other modules) ---
 
@@ -14,7 +16,7 @@ pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
 }
 
 // Used by query.rs `sum` to fold array elements via the "+" semantics.
-pub fn add_primitives(acc: Primitive, e: Primitive) -> Primitive {
+pub fn add_primitives(acc: Primitive, e: Primitive) -> Result<Primitive, crate::lang::functions::EvalError> {
     crate::interpreter::dispatch(
         crate::lang::FUNCTIONS.lookup("+"),
         vec![acc, e],
@@ -62,14 +64,33 @@ yaql_function!("*", mul_int(l: i64, r: i64) -> i64 { l * r });
 yaql_function!("*", mul_num(l: Number, r: Number) -> f64 { l.0 * r.0 });
 
 // --- "/" ---
-yaql_function!("/", div_int(l: i64, r: i64) -> i64 {
-    if r == 0 { panic!("division by zero") }
-    (l as f64 / r as f64).floor() as i64
-});
-yaql_function!("/", div_num(l: Number, r: Number) -> f64 {
-    if r.0 == 0.0 { panic!("division by zero") }
-    l.0 / r.0
-});
+pub fn div_int(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let Primitive::Int(l) = args[0] else { return Ok(Primitive::Null) };
+    let Primitive::Int(r) = args[1] else { return Ok(Primitive::Null) };
+    if r == 0 {
+        return Err(crate::lang::functions::EvalError::new("division by zero"));
+    }
+    Ok(Primitive::Int((l as f64 / r as f64).floor() as i64))
+}
+yaql_raw_function!("/", div_int, ArgSpec::Exact(2), [Type::Int, Type::Int], false);
+
+pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+    let l = match &args[0] {
+        Primitive::Int(n) => *n as f64,
+        Primitive::Float(n) => *n,
+        _ => return Ok(Primitive::Null),
+    };
+    let r = match &args[1] {
+        Primitive::Int(n) => *n as f64,
+        Primitive::Float(n) => *n,
+        _ => return Ok(Primitive::Null),
+    };
+    if r == 0.0 {
+        return Err(crate::lang::functions::EvalError::new("division by zero"));
+    }
+    Ok(Primitive::Float(l / r))
+}
+yaql_raw_function!("/", div_num, ArgSpec::Exact(2), [Type::Number, Type::Number], false);
 
 // --- "mod" ---
 yaql_function!("mod", mod_int(l: i64, r: i64) -> i64 {
