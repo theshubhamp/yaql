@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 yaql-core = { path = "../yaql-core" }
+yaql-macros = { path = "../yaql-macros" }
 inventory = "0.3.24"
 regex = "1"
 serde_json = "1.0.91"

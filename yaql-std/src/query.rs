@@ -1,6 +1,6 @@
 use yaql_core::lang::Primitive;
 use yaql_core::lang::primitive::LambdaBody;
-use crate::yaql_function;
+use yaql_macros::yaql_function;
 use crate::yaql_raw_function;
 use yaql_core::lang::functions::ArgSpec;
 use yaql_core::lang::functions::Type;
@@ -26,54 +26,88 @@ pub fn load_sort_keys() -> (Vec<Vec<Primitive>>, Vec<bool>) {
     (keys, desc)
 }
 
-yaql_function!("skip", skip(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
+#[yaql_function("skip")]
+fn skip(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
     let n = (n as usize).min(arr.len());
     arr[n..].to_vec()
-});
-yaql_function!("skip", skip_set(arr: SetVec, n: i64) -> SetVec {
+}
+
+#[yaql_function("skip")]
+fn skip_set(arr: SetVec, n: i64) -> SetVec {
     let n = (n as usize).min(arr.0.len());
     SetVec(arr.0[n..].to_vec())
-});
-yaql_function!("take", take(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
+}
+
+#[yaql_function("take")]
+fn take(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
     let n = (n as usize).min(arr.len());
     arr[..n].to_vec()
-});
-yaql_function!("take", take_set(arr: SetVec, n: i64) -> SetVec {
+}
+
+#[yaql_function("take")]
+fn take_set(arr: SetVec, n: i64) -> SetVec {
     let n = (n as usize).min(arr.0.len());
     SetVec(arr.0[..n].to_vec())
-});
-yaql_function!("limit", limit(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
+}
+
+#[yaql_function("limit")]
+fn limit(arr: Vec<Primitive>, n: i64) -> Vec<Primitive> {
     let n = (n as usize).min(arr.len());
     arr[..n].to_vec()
-});
+}
 
-yaql_function!("count", count_array(arr: Vec<Primitive>) -> i64 { arr.len() as i64 });
-yaql_function!("count", count_set(arr: SetVec) -> i64 { arr.0.len() as i64 });
-yaql_function!("count", count_map(m: std::collections::HashMap<String, Primitive>) -> i64 { m.len() as i64 });
-yaql_function!("count", count_string(s: String) -> i64 { s.chars().count() as i64 });
+#[yaql_function("count")]
+fn count_array(arr: Vec<Primitive>) -> i64 { arr.len() as i64 }
 
-yaql_function!("first", first(arr: Vec<Primitive>) -> Option<Primitive> { arr.first().cloned() });
-yaql_function!("first", first_set(arr: SetVec) -> Option<Primitive> { arr.0.first().cloned() });
-yaql_function!("last", last(arr: Vec<Primitive>) -> Option<Primitive> { arr.last().cloned() });
-yaql_function!("last", last_set(arr: SetVec) -> Option<Primitive> { arr.0.last().cloned() });
+#[yaql_function("count")]
+fn count_set(arr: SetVec) -> i64 { arr.0.len() as i64 }
 
-yaql_function!("first", first_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+#[yaql_function("count")]
+fn count_map(m: std::collections::HashMap<String, Primitive>) -> i64 { m.len() as i64 }
+
+#[yaql_function("count")]
+fn count_string(s: String) -> i64 { s.chars().count() as i64 }
+
+#[yaql_function("first")]
+fn first(arr: Vec<Primitive>) -> Option<Primitive> { arr.first().cloned() }
+
+#[yaql_function("first")]
+fn first_set(arr: SetVec) -> Option<Primitive> { arr.0.first().cloned() }
+
+#[yaql_function("last")]
+fn last(arr: Vec<Primitive>) -> Option<Primitive> { arr.last().cloned() }
+
+#[yaql_function("last")]
+fn last_set(arr: SetVec) -> Option<Primitive> { arr.0.last().cloned() }
+
+#[yaql_function("first")]
+fn first_default(arr: Vec<Primitive>, default: Any) -> Primitive {
     arr.first().cloned().unwrap_or(default.0)
-});
-yaql_function!("first", first_default_set(arr: SetVec, default: Any) -> Primitive {
+}
+
+#[yaql_function("first")]
+fn first_default_set(arr: SetVec, default: Any) -> Primitive {
     arr.0.first().cloned().unwrap_or(default.0)
-});
-yaql_function!("last", last_default(arr: Vec<Primitive>, default: Any) -> Primitive {
+}
+
+#[yaql_function("last")]
+fn last_default(arr: Vec<Primitive>, default: Any) -> Primitive {
     arr.last().cloned().unwrap_or(default.0)
-});
-yaql_function!("last", last_default_set(arr: SetVec, default: Any) -> Primitive {
+}
+
+#[yaql_function("last")]
+fn last_default_set(arr: SetVec, default: Any) -> Primitive {
     arr.0.last().cloned().unwrap_or(default.0)
-});
+}
 
-yaql_function!("range", range_one(n: i64) -> Vec<Primitive> { (0..n).map(Primitive::Int).collect() });
-yaql_function!("range", range_two(start: i64, end: i64) -> Vec<Primitive> { (start..end).map(Primitive::Int).collect() });
+#[yaql_function("range")]
+fn range_one(n: i64) -> Vec<Primitive> { (0..n).map(Primitive::Int).collect() }
 
-yaql_function!("range", range_three(start: i64, end: i64, step: i64) -> Option<Vec<Primitive>> {
+#[yaql_function("range")]
+fn range_two(start: i64, end: i64) -> Vec<Primitive> { (start..end).map(Primitive::Int).collect() }
+
+#[yaql_function("range")]
+fn range_three(start: i64, end: i64, step: i64) -> Option<Vec<Primitive>> {
     if step == 0 {
         None
     } else if step > 0 {
@@ -81,7 +115,7 @@ yaql_function!("range", range_three(start: i64, end: i64, step: i64) -> Option<V
     } else {
         Some((0..).map(|i| start + i * step).take_while(|&x| x > end).map(Primitive::Int).collect())
     }
-});
+}
 
 pub fn append(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
     let Some(Primitive::Array(arr)) = args.first() else { return Ok(Primitive::Null) };
@@ -91,25 +125,32 @@ pub fn append(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Res
 }
 yaql_raw_function!("append", append, ArgSpec::Min(1), [Type::Array], false);
 
-yaql_function!("reverse", reverse_array(arr: Vec<Primitive>) -> Vec<Primitive> {
+#[yaql_function("reverse")]
+fn reverse_array(arr: Vec<Primitive>) -> Vec<Primitive> {
     let mut r = arr; r.reverse(); r
-});
-yaql_function!("reverse", reverse_set(arr: SetVec) -> SetVec {
+}
+
+#[yaql_function("reverse")]
+fn reverse_set(arr: SetVec) -> SetVec {
     let mut r = arr.0; r.reverse(); SetVec(r)
-});
-yaql_function!("reverse", reverse_string(s: String) -> String { s.chars().rev().collect() });
+}
 
-yaql_function!("isIterable", is_iterable(v: Any) -> bool {
+#[yaql_function("reverse")]
+fn reverse_string(s: String) -> String { s.chars().rev().collect() }
+
+#[yaql_function("isIterable")]
+fn is_iterable(v: Any) -> bool {
     matches!(v.0, Primitive::Array(_) | Primitive::Set(_))
-});
+}
 
-yaql_function!("distinct", distinct(arr: Vec<Primitive>) -> Vec<Primitive> {
+#[yaql_function("distinct")]
+fn distinct(arr: Vec<Primitive>) -> Vec<Primitive> {
     let mut seen = Vec::new();
     for e in &arr {
         yaql_core::lang::sets::set_push_unique(&mut seen, e);
     }
     seen
-});
+}
 
 // sum: array.sum() or array.sum(init)
 // Set dispatch (SetVec) reuses the same impl.
@@ -125,58 +166,73 @@ pub fn sum_impl(arr: Vec<Primitive>, init: Option<Primitive>) -> Result<Primitiv
     };
     arr.iter().try_fold(init, |acc, e| crate::operators::add_primitives(acc, e.clone()))
 }
-yaql_function!("sum", sum_arr(arr: Vec<Primitive>) -> Primitive { crate::query::sum_impl(arr, None).unwrap_or(Primitive::Null) });
-yaql_function!("sum", sum_set(arr: SetVec) -> Primitive { crate::query::sum_impl(arr.0, None).unwrap_or(Primitive::Null) });
-yaql_function!("sum", sum_arr_init(arr: Vec<Primitive>, init: Any) -> Primitive { crate::query::sum_impl(arr, Some(init.0)).unwrap_or(Primitive::Null) });
-yaql_function!("sum", sum_set_init(arr: SetVec, init: Any) -> Primitive { crate::query::sum_impl(arr.0, Some(init.0)).unwrap_or(Primitive::Null) });
+#[yaql_function("sum")]
+fn sum_arr(arr: Vec<Primitive>) -> Primitive { crate::query::sum_impl(arr, None).unwrap_or(Primitive::Null) }
 
-yaql_function!("splitAt", split_at_fn(arr: Vec<Primitive>, pos: i64) -> Vec<Primitive> {
+#[yaql_function("sum")]
+fn sum_set(arr: SetVec) -> Primitive { crate::query::sum_impl(arr.0, None).unwrap_or(Primitive::Null) }
+
+#[yaql_function("sum")]
+fn sum_arr_init(arr: Vec<Primitive>, init: Any) -> Primitive { crate::query::sum_impl(arr, Some(init.0)).unwrap_or(Primitive::Null) }
+
+#[yaql_function("sum")]
+fn sum_set_init(arr: SetVec, init: Any) -> Primitive { crate::query::sum_impl(arr.0, Some(init.0)).unwrap_or(Primitive::Null) }
+
+#[yaql_function("splitAt")]
+fn split_at_fn(arr: Vec<Primitive>, pos: i64) -> Vec<Primitive> {
     let len = arr.len() as i64;
     let pos = if pos < 0 { ((len + pos).max(0)) as usize } else { (pos as usize).min(arr.len()) };
     vec![
         Primitive::Array(arr[..pos].to_vec()),
         Primitive::Array(arr[pos..].to_vec()),
     ]
-});
+}
 
 // --- enumerate ---
-yaql_function!("enumerate", enumerate_1(arr: Vec<Primitive>) -> Vec<Primitive> {
+#[yaql_function("enumerate")]
+fn enumerate_1(arr: Vec<Primitive>) -> Vec<Primitive> {
     arr.iter().enumerate().map(|(i, v)| {
         Primitive::Array(vec![Primitive::Int(i as i64), v.clone()])
     }).collect()
-});
+}
 
-yaql_function!("enumerate", enumerate_2(arr: Vec<Primitive>, start: i64) -> Vec<Primitive> {
+#[yaql_function("enumerate")]
+fn enumerate_2(arr: Vec<Primitive>, start: i64) -> Vec<Primitive> {
     arr.iter().enumerate().map(|(i, v)| {
         Primitive::Array(vec![Primitive::Int(start + i as i64), v.clone()])
     }).collect()
-});
+}
 
 // --- single ---
-yaql_function!("single", single_fn(arr: Vec<Primitive>) -> Primitive {
+#[yaql_function("single")]
+fn single_fn(arr: Vec<Primitive>) -> Primitive {
     if arr.len() == 1 { arr[0].clone() } else { Primitive::Null }
-});
+}
 
 // --- slice (chunk into sublists of given size) ---
-yaql_function!("slice", slice_fn(arr: Vec<Primitive>, size: i64) -> Vec<Primitive> {
+#[yaql_function("slice")]
+fn slice_fn(arr: Vec<Primitive>, size: i64) -> Vec<Primitive> {
     let size = (size as usize).max(1);
     arr.chunks(size).map(|chunk| Primitive::Array(chunk.to_vec())).collect()
-});
+}
 
 // --- any (no predicate: non-empty) ---
-yaql_function!("any", any_fn(arr: Vec<Primitive>) -> bool {
+#[yaql_function("any")]
+fn any_fn(arr: Vec<Primitive>) -> bool {
     !arr.is_empty()
-});
+}
 
 // --- all (no predicate: all truthy) ---
-yaql_function!("all", all_fn(arr: Vec<Primitive>) -> bool {
+#[yaql_function("all")]
+fn all_fn(arr: Vec<Primitive>) -> bool {
     arr.iter().all(yaql_core::lang::truthy)
-});
+}
 
 // --- defaultIfEmpty ---
-yaql_function!("defaultIfEmpty", default_if_empty_fn(arr: Vec<Primitive>, default: Any) -> Primitive {
+#[yaql_function("defaultIfEmpty")]
+fn default_if_empty_fn(arr: Vec<Primitive>, default: Any) -> Primitive {
     if arr.is_empty() { default.0 } else { Primitive::Array(arr) }
-});
+}
 
 // --- Lambda-consuming functions ---
 
@@ -226,7 +282,8 @@ pub fn select_many_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 yaql_raw_function!("selectMany", select_many_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
 // selectMany with a constant (non-lambda) arg -> flatten the constant for each element
-yaql_function!("selectMany", select_many_constant(arr: Vec<Primitive>, constant: Any) -> Vec<Primitive> {
+#[yaql_function("selectMany")]
+fn select_many_constant(arr: Vec<Primitive>, constant: Any) -> Vec<Primitive> {
     let mut result = Vec::new();
     for _ in arr {
         match &constant.0 {
@@ -235,7 +292,7 @@ yaql_function!("selectMany", select_many_constant(arr: Vec<Primitive>, constant:
         }
     }
     result
-});
+}
 
 // orderBy: array.orderBy(selector) -> sorted array (stores sort keys for thenBy)
 pub fn order_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -255,13 +312,14 @@ pub fn order_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
 yaql_raw_function!("orderBy", order_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
 // orderBy without selector -> sort directly (key = element itself)
-yaql_function!("orderBy", order_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+#[yaql_function("orderBy")]
+fn order_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
     let mut sorted = arr;
     sorted.sort_by(|a, b| yaql_core::lang::compare(a, b));
     let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
     crate::query::store_sort_keys(keys, vec![false]);
     sorted
-});
+}
 
 // orderByDescending
 pub fn order_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -281,13 +339,14 @@ pub fn order_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive
 yaql_raw_function!("orderByDescending", order_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
 // orderByDescending without selector -> sort directly descending
-yaql_function!("orderByDescending", order_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+#[yaql_function("orderByDescending")]
+fn order_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
     let mut sorted = arr;
     sorted.sort_by(|a, b| yaql_core::lang::compare(b, a));
     let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
     crate::query::store_sort_keys(keys, vec![true]);
     sorted
-});
+}
 
 // thenBy (compound sort: sort by new key, tiebreak by previous keys)
 pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -321,7 +380,8 @@ pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
 }
 yaql_raw_function!("thenBy", then_by_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("thenBy", then_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr });
+#[yaql_function("thenBy")]
+fn then_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr }
 
 pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
     let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
@@ -354,7 +414,8 @@ pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)
 }
 yaql_raw_function!("thenByDescending", then_by_desc_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("thenByDescending", then_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr });
+#[yaql_function("thenByDescending")]
+fn then_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr }
 
 pub fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[bool]) -> std::cmp::Ordering {
     for (i, (ka, kb)) in a.iter().zip(b.iter()).enumerate() {
@@ -409,9 +470,10 @@ pub fn any_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
 }
 yaql_raw_function!("any", any_pred_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("any", any_identity(arr: Vec<Primitive>, _any: Any) -> bool {
+#[yaql_function("any")]
+fn any_identity(arr: Vec<Primitive>, _any: Any) -> bool {
     !arr.is_empty()
-});
+}
 
 // all with predicate
 pub fn all_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -426,9 +488,10 @@ pub fn all_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
 }
 yaql_raw_function!("all", all_pred_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("all", all_identity(arr: Vec<Primitive>, _any: Any) -> bool {
+#[yaql_function("all")]
+fn all_identity(arr: Vec<Primitive>, _any: Any) -> bool {
     arr.iter().all(yaql_core::lang::truthy)
-});
+}
 
 // distinct with selector
 pub fn distinct_sel_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -447,13 +510,14 @@ pub fn distinct_sel_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)
 }
 yaql_raw_function!("distinct", distinct_sel_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("distinct", distinct_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
+#[yaql_function("distinct")]
+fn distinct_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
     let mut seen = Vec::new();
     for e in arr {
         yaql_core::lang::sets::set_push_unique(&mut seen, &e);
     }
     seen
-});
+}
 
 // indexWhere
 pub fn index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -468,7 +532,8 @@ pub fn index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 }
 yaql_raw_function!("indexWhere", index_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("indexWhere", index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 });
+#[yaql_function("indexWhere")]
+fn index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 }
 
 // lastIndexWhere
 pub fn last_index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -483,7 +548,8 @@ pub fn last_index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primit
 }
 yaql_raw_function!("lastIndexWhere", last_index_where_fn, ArgSpec::Exact(2), [Type::Array, Type::Lambda], false);
 
-yaql_function!("lastIndexWhere", last_index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 });
+#[yaql_function("lastIndexWhere")]
+fn last_index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 }
 
 // aggregate: array.aggregate(func) or array.aggregate(func, init)
 pub fn aggregate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -862,7 +928,8 @@ yaql_raw_function!("repeat", repeat_fn, ArgSpec::Min(1), [Type::Any], false);
 
 // --- cycle ---
 // cycle(array) -> infinite cycling of array elements (capped at 10000)
-yaql_function!("cycle", cycle_fn(arr: Vec<Primitive>) -> Vec<Primitive> {
+#[yaql_function("cycle")]
+fn cycle_fn(arr: Vec<Primitive>) -> Vec<Primitive> {
     if arr.is_empty() { Vec::new() }
     else { (0..10000).map(|i| arr[i % arr.len()].clone()).collect() }
-});
+}

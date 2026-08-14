@@ -1,6 +1,6 @@
 use yaql_core::lang::Primitive;
 use yaql_core::lang::functions::{ArgSpec, Type, RegexWrapper};
-use crate::yaql_function;
+use yaql_macros::yaql_function;
 use crate::yaql_raw_function;
 use regex::{Regex, RegexBuilder};
 
@@ -31,29 +31,33 @@ pub fn regex_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Re
 yaql_raw_function!("regex", regex_fn, ArgSpec::Min(1), [Type::String], true);
 
 // escapeRegex(s)
-yaql_function!("escapeRegex", escape_regex(s: String) -> String {
+#[yaql_function("escapeRegex")]
+fn escape_regex(s: String) -> String {
     regex::escape(&s)
-});
+}
 
 // isRegex(x)
-yaql_function!("isRegex", is_regex(v: Any) -> bool {
+#[yaql_function("isRegex")]
+fn is_regex(v: Any) -> bool {
     matches!(v.0, Primitive::Regex(_))
-});
+}
 
 // --- matches ---
 // regex.matches(string) -> bool (partial match / search)
-yaql_function!("matches", regex_matches(re: RegexWrapper, s: String) -> bool {
+#[yaql_function("matches")]
+fn regex_matches(re: RegexWrapper, s: String) -> bool {
     re.0.is_match(&s)
-});
+}
 
 // string.matches(string) -> bool (full match via anchoring)
-yaql_function!("matches", str_matches(s: String, pattern: String) -> Option<bool> {
+#[yaql_function("matches")]
+fn str_matches(s: String, pattern: String) -> Option<bool> {
     let anchored = format!("^(?:{})$", pattern);
     match regex::Regex::new(&anchored) {
         Ok(re) => Some(re.is_match(&s)),
         Err(_) => None,
     }
-});
+}
 
 // --- search ---
 // regex.search(string) -> string | null  (first full match value)
@@ -125,13 +129,14 @@ pub fn regex_split_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 yaql_raw_function!("split", regex_split_fn, ArgSpec::Min(2), [Type::Regex, Type::String], false);
 
 // string.split(regex) -> array
-yaql_function!("split", str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<Primitive> {
+#[yaql_function("split")]
+fn str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<Primitive> {
     if re.0.captures_len() > 1 {
         crate::regex::split_captures(&re.0, &s)
     } else {
         re.0.split(&s).map(|p| Primitive::String(p.to_string())).collect()
     }
-});
+}
 
 // --- replace ---
 // regex.replace(string, replacement) -> string

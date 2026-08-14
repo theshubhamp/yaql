@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "yaql-core", "yaql-std"]
+members = [".", "yaql-core", "yaql-std", "yaql-macros"]
 
 [package]
 name = "yaql"
