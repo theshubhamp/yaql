@@ -1,5 +1,5 @@
 [workspace]
-members = ["."]
+members = [".", "yaql-core", "yaql-std"]
 
 [package]
 name = "yaql"
@@ -7,6 +7,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+yaql-core = { path = "yaql-core" }
+yaql-std = { path = "yaql-std" }
 inventory = "0.3.24"
 regex = "1"
 serde_json = "1.0.91"

@@ -1,8 +1,9 @@
-use crate::lang::primitive::Primitive;
+use yaql_core::lang::Primitive;
+use yaql_core::lang::functions::EvalError;
+use yaql_core::lang::functions::ArgSpec;
+use yaql_core::lang::functions::Type;
 use crate::yaql_function;
 use crate::yaql_raw_function;
-use crate::lang::functions::ArgSpec;
-use crate::lang::functions::Type;
 
 yaql_function!("len", len_string(s: String) -> i64 { s.chars().count() as i64 });
 yaql_function!("len", len_array(a: Vec<Primitive>) -> i64 { a.len() as i64 });
@@ -77,12 +78,12 @@ pub(crate) fn primitive_to_str(p: &Primitive) -> String {
 }
 
 yaql_function!("join", join_method(arr: Vec<Primitive>, sep: String) -> String {
-    let parts: Vec<String> = arr.iter().map(crate::lang::strings::primitive_to_str).collect();
+    let parts: Vec<String> = arr.iter().map(crate::strings::primitive_to_str).collect();
     parts.join(sep.as_str())
 });
 
 yaql_function!("join", join_pythonic(sep: String, arr: Vec<Primitive>) -> String {
-    let parts: Vec<String> = arr.iter().map(crate::lang::strings::primitive_to_str).collect();
+    let parts: Vec<String> = arr.iter().map(crate::strings::primitive_to_str).collect();
     parts.join(sep.as_str())
 });
 
@@ -121,7 +122,7 @@ yaql_function!("replace", replace_str_4(s: String, old: String, new: String, cou
     if old.is_empty() { s } else { s.replacen(old.as_str(), new.as_str(), count as usize) }
 });
 
-pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
     let count = if args.len() > 2 {
         if let Primitive::Int(c) = &args[2] { Some(*c) } else { None }
@@ -212,7 +213,7 @@ yaql_function!("indexOf", index_of_2(s: String, needle: String) -> i64 {
 yaql_function!("indexOf", index_of_3(s: String, needle: String, start: i64) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = crate::lang::strings::norm_start(len, start);
+    let start = crate::strings::norm_start(len, start);
     let end = len as usize;
     if end < start { -1 } else {
         let hay: String = chars[start..end].iter().collect();
@@ -226,8 +227,8 @@ yaql_function!("indexOf", index_of_3(s: String, needle: String, start: i64) -> i
 yaql_function!("indexOf", index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = crate::lang::strings::norm_start(len, start);
-    let end = crate::lang::strings::norm_end(len, start, end);
+    let start = crate::strings::norm_start(len, start);
+    let end = crate::strings::norm_end(len, start, end);
     if end < start { -1 } else {
         let hay: String = chars[start..end].iter().collect();
         match hay.find(needle.as_str()) {
@@ -252,7 +253,7 @@ yaql_function!("lastIndexOf", last_index_of_2(s: String, needle: String) -> i64 
 yaql_function!("lastIndexOf", last_index_of_3(s: String, needle: String, start: i64) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = crate::lang::strings::norm_start(len, start);
+    let start = crate::strings::norm_start(len, start);
     let end = len as usize;
     if end < start { -1 } else {
         let hay: String = chars[start..end].iter().collect();
@@ -266,8 +267,8 @@ yaql_function!("lastIndexOf", last_index_of_3(s: String, needle: String, start: 
 yaql_function!("lastIndexOf", last_index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    let start = crate::lang::strings::norm_start(len, start);
-    let end = crate::lang::strings::norm_end(len, start, end);
+    let start = crate::strings::norm_start(len, start);
+    let end = crate::strings::norm_end(len, start, end);
     if end < start { -1 } else {
         let hay: String = chars[start..end].iter().collect();
         match hay.rfind(needle.as_str()) {
@@ -279,7 +280,7 @@ yaql_function!("lastIndexOf", last_index_of_4(s: String, needle: String, start: 
 
 // --- startsWith / endsWith with varargs ---
 
-pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
         if let Primitive::String(prefix) = p { s.starts_with(prefix.as_str()) } else { false }
@@ -288,7 +289,7 @@ pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primit
 }
 yaql_raw_function!("startsWith", starts_with_varargs, ArgSpec::Min(2), [Type::String], false);
 
-pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
         if let Primitive::String(suffix) = p { s.ends_with(suffix.as_str()) } else { false }

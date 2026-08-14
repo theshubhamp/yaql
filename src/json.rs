@@ -1,5 +1,5 @@
-use crate::lang::Primitive;
-use crate::lang::primitive::{compare, type_rank};
+use yaql_core::lang::Primitive;
+use yaql_core::lang::primitive::{compare, type_rank};
 
 pub fn json_to_primitive(value: &serde_json::Value) -> Primitive {
     match value {

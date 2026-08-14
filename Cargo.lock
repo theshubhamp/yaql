@@ -151,6 +151,27 @@ dependencies = [
  "inventory",
  "regex",
  "serde_json",
+ "yaql-core",
+ "yaql-std",
+]
+
+[[package]]
+name = "yaql-core"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "regex",
+ "serde_json",
+]
+
+[[package]]
+name = "yaql-std"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "regex",
+ "serde_json",
+ "yaql-core",
 ]
 
 [[package]]

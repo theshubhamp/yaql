@@ -1,4 +1,4 @@
-use crate::ast::Value;
+use yaql_core::ast::Value;
 use crate::lexer::{LexError, Lexer, Tok};
 use std::fmt;
 use std::str::FromStr;

@@ -1,10 +1,12 @@
 use crate::ast::Value;
-use crate::lang::{truthy, ArgSpec, FUNCTIONS, Primitive, Spec};
-use crate::lang::functions::EvalError;
+use crate::lang::{truthy, Primitive};
+use crate::lang::functions::{EvalError, FUNCTIONS, dispatch};
 use crate::lang::primitive::LambdaBody;
 use std::sync::Arc;
 
 pub use crate::lang::primitive::LambdaBody as Lambda;
+
+// --- Interpreter ---
 
 pub struct Interpreter {
     pub contexts: Vec<Primitive>,
@@ -287,43 +289,6 @@ impl Interpreter {
         self.contexts = saved;
         result
     }
-}
-
-/// Find the best matching overload and call it.
-/// `overloads` is expected to be the pre-sorted list from `FUNCTIONS.lookup`.
-pub(crate) fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let typed: Vec<&Spec> = overloads.iter().filter(|s| !s.arg_types.is_empty()).collect();
-    let untyped: Vec<&Spec> = overloads.iter().filter(|s| s.arg_types.is_empty()).collect();
-    let ordered: Vec<&Spec> = typed.into_iter().chain(untyped.into_iter()).collect();
-    for spec in &ordered {
-        if !spec.kwargs && !kwargs.is_empty() {
-            continue;
-        }
-        let arg_count_ok = match spec.args {
-            ArgSpec::Exact(n) => args.len() == n,
-            ArgSpec::Min(n) => args.len() >= n,
-            ArgSpec::Varargs => true,
-        };
-        if !arg_count_ok {
-            continue;
-        }
-        let types_ok = spec.arg_types.iter().enumerate()
-            .all(|(i, ty)| i >= args.len() || ty.matches(&args[i]));
-        if !types_ok {
-            continue;
-        }
-        return (spec.func)(args, kwargs);
-    }
-    if let Some(spec) = overloads.first() {
-        if !spec.kwargs { assert_eq!(kwargs.len(), 0); }
-        match spec.args {
-            ArgSpec::Exact(n) => assert_eq!(args.len(), n),
-            ArgSpec::Min(n) => assert!(args.len() >= n),
-            ArgSpec::Varargs => {}
-        }
-        return (spec.func)(args, kwargs);
-    }
-    Ok(Primitive::Null)
 }
 
 fn unquote(raw: &str) -> String {

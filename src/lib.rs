@@ -1,9 +1,14 @@
-pub mod ast;
-pub mod interpreter;
 pub mod json;
-pub mod lang;
 pub mod lexer;
 pub mod parser;
+
+pub use yaql_core::ast;
+pub use yaql_core::interpreter;
+pub use yaql_core::lang;
+
+// Reference the stdlib crate so its `inventory::submit!` registrations are
+// linked into the final binary (otherwise the linker dead-strips them).
+pub use yaql_std as stdlib;
 
 use interpreter::Interpreter;
 use lang::Primitive;

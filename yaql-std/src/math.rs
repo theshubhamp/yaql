@@ -1,7 +1,5 @@
 use crate::yaql_function;
 
-// --- Typed function definitions + registration ---
-
 yaql_function!("abs", abs_int(n: i64) -> i64 { n.abs() });
 yaql_function!("abs", abs_float(n: f64) -> f64 { n.abs() });
 yaql_function!("sign", sign_int(n: i64) -> i64 { n.signum() });

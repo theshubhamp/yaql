@@ -1,8 +1,6 @@
 pub use crate::lang::primitive::Primitive;
 pub use crate::lang::primitive::RegexWrapper;
 pub use crate::lang::primitive::LambdaBody;
-pub use crate::interpreter::eval_lambda;
-pub use crate::lang::query::{store_sort_keys, load_sort_keys, compare_key_vectors_with_desc, eval_lambda_2arg};
 pub use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -243,106 +241,6 @@ impl<T: IntoPrimitive> IntoPrimitive for Option<T> {
     }
 }
 
-// --- Macros ---
-
-#[macro_export]
-macro_rules! yaql_function {
-    ($yaql_name:literal, $name:ident() -> $ret:ty $body:block) => {
-        mod $name {
-            use crate::lang::functions::*;
-            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(0), &[], false);
-            pub fn func(_args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-                let __ret: $ret = $body;
-                Ok(IntoPrimitive::into_primitive(__ret))
-            }
-        }
-        inventory::submit! { $name::SPEC }
-    };
-    ($yaql_name:literal, $name:ident($p0:ident : $t0:ty) -> $ret:ty $body:block) => {
-        mod $name {
-            use crate::lang::functions::*;
-            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(1), &[<$t0 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-                let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let __ret: $ret = $body;
-                Ok(IntoPrimitive::into_primitive(__ret))
-            }
-        }
-        inventory::submit! { $name::SPEC }
-    };
-    ($yaql_name:literal, $name:ident($p0:ident : $t0:ty, $p1:ident : $t1:ty) -> $ret:ty $body:block) => {
-        mod $name {
-            use crate::lang::functions::*;
-            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(2), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-                let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let __ret: $ret = $body;
-                Ok(IntoPrimitive::into_primitive(__ret))
-            }
-        }
-        inventory::submit! { $name::SPEC }
-    };
-    ($yaql_name:literal, $name:ident($p0:ident : $t0:ty, $p1:ident : $t1:ty, $p2:ident : $t2:ty) -> $ret:ty $body:block) => {
-        mod $name {
-            use crate::lang::functions::*;
-            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(3), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE, <$t2 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-                let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let __ret: $ret = $body;
-                Ok(IntoPrimitive::into_primitive(__ret))
-            }
-        }
-        inventory::submit! { $name::SPEC }
-    };
-    ($yaql_name:literal, $name:ident($p0:ident : $t0:ty, $p1:ident : $t1:ty, $p2:ident : $t2:ty, $p3:ident : $t3:ty) -> $ret:ty $body:block) => {
-        mod $name {
-            use crate::lang::functions::*;
-            pub const SPEC: Spec = Spec::new($yaql_name, func, ArgSpec::Exact(4), &[<$t0 as FromPrimitive>::TYPE, <$t1 as FromPrimitive>::TYPE, <$t2 as FromPrimitive>::TYPE, <$t3 as FromPrimitive>::TYPE], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-                let $p0 = match <$t0 as FromPrimitive>::from_primitive(&args[0]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p1 = match <$t1 as FromPrimitive>::from_primitive(&args[1]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p2 = match <$t2 as FromPrimitive>::from_primitive(&args[2]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let $p3 = match <$t3 as FromPrimitive>::from_primitive(&args[3]) {
-                    Some(v) => v, None => return Ok(Primitive::Null),
-                };
-                let __ret: $ret = $body;
-                Ok(IntoPrimitive::into_primitive(__ret))
-            }
-        }
-        inventory::submit! { $name::SPEC }
-    };
-}
-
-#[macro_export]
-macro_rules! yaql_raw_function {
-    ($yaql_name:literal, $func:expr, $args:expr, [$($t:expr),*], $kwargs:expr) => {
-        inventory::submit! {
-            crate::lang::functions::Spec::new($yaql_name, $func, $args, &[$($t),*], $kwargs)
-        }
-    };
-}
-
 // --- Lookup ---
 
 pub struct Functions;
@@ -360,19 +258,12 @@ pub static FUNCTIONS: Functions = Functions {};
 use std::sync::OnceLock;
 use std::collections::HashMap as StdHashMap;
 
-/// Pre-sorted overload list for a function name, cached after first use.
-/// The sort in `dispatch` is deterministic, so we can hoist it out of the
-/// per-call hot path.
-pub struct CachedOverloads {
-    pub ordered: Vec<Spec>,
-}
-
 fn sort_overloads(mut overloads: Vec<Spec>) -> Vec<Spec> {
     overloads.sort_by(|a, b| {
         let score = |s: &Spec| {
             s.arg_types.iter().map(|ty| match ty {
-                crate::lang::Type::Any => 3,
-                crate::lang::Type::Number => 2,
+                Type::Any => 3,
+                Type::Number => 2,
                 _ => 0,
             }).sum::<u32>()
         };
@@ -405,3 +296,42 @@ pub fn cached_overloads(name: &str) -> &'static Vec<Spec> {
 }
 
 static EMPTY_OVERLOADS: Vec<Spec> = Vec::new();
+
+// --- Dispatch ---
+
+/// Find the best matching overload and call it.
+/// `overloads` is expected to be the pre-sorted list from `FUNCTIONS.lookup`.
+pub fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
+    let typed: Vec<&Spec> = overloads.iter().filter(|s| !s.arg_types.is_empty()).collect();
+    let untyped: Vec<&Spec> = overloads.iter().filter(|s| s.arg_types.is_empty()).collect();
+    let ordered: Vec<&Spec> = typed.into_iter().chain(untyped.into_iter()).collect();
+    for spec in &ordered {
+        if !spec.kwargs && !kwargs.is_empty() {
+            continue;
+        }
+        let arg_count_ok = match spec.args {
+            ArgSpec::Exact(n) => args.len() == n,
+            ArgSpec::Min(n) => args.len() >= n,
+            ArgSpec::Varargs => true,
+        };
+        if !arg_count_ok {
+            continue;
+        }
+        let types_ok = spec.arg_types.iter().enumerate()
+            .all(|(i, ty)| i >= args.len() || ty.matches(&args[i]));
+        if !types_ok {
+            continue;
+        }
+        return (spec.func)(args, kwargs);
+    }
+    if let Some(spec) = overloads.first() {
+        if !spec.kwargs { assert_eq!(kwargs.len(), 0); }
+        match spec.args {
+            ArgSpec::Exact(n) => assert_eq!(args.len(), n),
+            ArgSpec::Min(n) => assert!(args.len() >= n),
+            ArgSpec::Varargs => {}
+        }
+        return (spec.func)(args, kwargs);
+    }
+    Ok(Primitive::Null)
+}

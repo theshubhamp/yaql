@@ -1,5 +1,7 @@
-use crate::lang::primitive::Primitive;
-use crate::lang::functions::{ArgSpec, Type};
+use yaql_core::lang::Primitive;
+use yaql_core::lang::FUNCTIONS;
+use yaql_core::lang::functions::{EvalError, ArgSpec, Type};
+use yaql_core::lang::functions::dispatch;
 use crate::yaql_function;
 use crate::yaql_raw_function;
 
@@ -16,9 +18,9 @@ pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
 }
 
 // Used by query.rs `sum` to fold array elements via the "+" semantics.
-pub fn add_primitives(acc: Primitive, e: Primitive) -> Result<Primitive, crate::lang::functions::EvalError> {
-    crate::interpreter::dispatch(
-        crate::lang::FUNCTIONS.lookup("+"),
+pub fn add_primitives(acc: Primitive, e: Primitive) -> Result<Primitive, EvalError> {
+    dispatch(
+        FUNCTIONS.lookup("+"),
         vec![acc, e],
         vec![],
     )
@@ -29,7 +31,7 @@ yaql_function!("+", add_str(l: String, r: String) -> String { format!("{}{}", l,
 yaql_function!("+", add_arr(l: Vec<Primitive>, r: Vec<Primitive>) -> Vec<Primitive> { let mut c = l; c.extend(r); c });
 yaql_function!("+", add_set_set(l: SetVec, r: SetVec) -> SetVec {
     let mut c = l.0;
-    for e in &r.0 { crate::lang::sets::set_push_unique(&mut c, e); }
+    for e in &r.0 { yaql_core::lang::sets::set_push_unique(&mut c, e); }
     SetVec(c)
 });
 yaql_function!("+", add_set_arr(l: SetVec, r: Vec<Primitive>) -> Vec<Primitive> {
@@ -46,7 +48,7 @@ yaql_function!("+", add_num(l: Number, r: Number) -> f64 { l.0 + r.0 });
 
 // --- "-" ---
 yaql_function!("-", sub_set(l: SetVec, r: SetVec) -> SetVec {
-    SetVec(crate::lang::sets::set_difference(&l.0, &r.0))
+    SetVec(yaql_core::lang::sets::set_difference(&l.0, &r.0))
 });
 yaql_function!("-", sub_int(l: i64, r: i64) -> i64 { l - r });
 yaql_function!("-", sub_num(l: Number, r: Number) -> f64 { l.0 - r.0 });
@@ -64,17 +66,17 @@ yaql_function!("*", mul_int(l: i64, r: i64) -> i64 { l * r });
 yaql_function!("*", mul_num(l: Number, r: Number) -> f64 { l.0 * r.0 });
 
 // --- "/" ---
-pub fn div_int(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+pub fn div_int(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Int(l) = args[0] else { return Ok(Primitive::Null) };
     let Primitive::Int(r) = args[1] else { return Ok(Primitive::Null) };
     if r == 0 {
-        return Err(crate::lang::functions::EvalError::new("division by zero"));
+        return Err(EvalError::new("division by zero"));
     }
     Ok(Primitive::Int((l as f64 / r as f64).floor() as i64))
 }
 yaql_raw_function!("/", div_int, ArgSpec::Exact(2), [Type::Int, Type::Int], false);
 
-pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, crate::lang::functions::EvalError> {
+pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let l = match &args[0] {
         Primitive::Int(n) => *n as f64,
         Primitive::Float(n) => *n,
@@ -86,7 +88,7 @@ pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
         _ => return Ok(Primitive::Null),
     };
     if r == 0.0 {
-        return Err(crate::lang::functions::EvalError::new("division by zero"));
+        return Err(EvalError::new("division by zero"));
     }
     Ok(Primitive::Float(l / r))
 }
@@ -108,22 +110,22 @@ yaql_function!("=", eq_num_bool(l: Number, r: bool) -> bool { (l.0 == 1.0) == r 
 yaql_function!("=", eq_bool_num(l: bool, r: Number) -> bool { l == (r.0 == 1.0) });
 yaql_function!("=", eq_null(l: Null, r: Null) -> bool { true });
 yaql_function!("=", eq_arr(l: Vec<Primitive>, r: Vec<Primitive>) -> bool {
-    l.len() == r.len() && l.iter().zip(r.iter()).all(|(a, b)| crate::lang::primitive::primitive_eq(a, b))
+    l.len() == r.len() && l.iter().zip(r.iter()).all(|(a, b)| yaql_core::lang::primitive_eq(a, b))
 });
 yaql_function!("=", eq_set(l: SetVec, r: SetVec) -> bool {
-    crate::lang::sets::set_equal(&l.0, &r.0)
+    yaql_core::lang::sets::set_equal(&l.0, &r.0)
 });
 yaql_function!("=", eq_map(l: HashMap<String, Primitive>, r: HashMap<String, Primitive>) -> bool {
-    l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| crate::lang::primitive::primitive_eq(v, rv)))
+    l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| yaql_core::lang::primitive_eq(v, rv)))
 });
 yaql_function!("=", eq_any(l: Any, r: Any) -> bool { false });
 
 // --- "!=" ---
-yaql_function!("!=", neq(l: Any, r: Any) -> bool { !crate::lang::primitive::primitive_eq(&l.0, &r.0) });
+yaql_function!("!=", neq(l: Any, r: Any) -> bool { !yaql_core::lang::primitive_eq(&l.0, &r.0) });
 
 // --- "<" ---
 yaql_function!("<", lt_set(l: SetVec, r: SetVec) -> bool {
-    l.0.len() < r.0.len() && crate::lang::sets::is_subset(&l.0, &r.0)
+    l.0.len() < r.0.len() && yaql_core::lang::sets::is_subset(&l.0, &r.0)
 });
 yaql_function!("<", lt_null_null(l: Null, r: Null) -> bool { false });
 yaql_function!("<", lt_null_any(l: Null, r: Any) -> bool { true });
@@ -133,7 +135,7 @@ yaql_function!("<", lt_any(l: Any, r: Any) -> bool { false });
 
 // --- "<=" ---
 yaql_function!("<=", lteq_set(l: SetVec, r: SetVec) -> bool {
-    crate::lang::sets::is_subset(&l.0, &r.0)
+    yaql_core::lang::sets::is_subset(&l.0, &r.0)
 });
 yaql_function!("<=", lteq_null_null(l: Null, r: Null) -> bool { true });
 yaql_function!("<=", lteq_null_any(l: Null, r: Any) -> bool { true });
@@ -143,7 +145,7 @@ yaql_function!("<=", lteq_any(l: Any, r: Any) -> bool { false });
 
 // --- ">" ---
 yaql_function!(">", gt_set(l: SetVec, r: SetVec) -> bool {
-    l.0.len() > r.0.len() && crate::lang::sets::is_subset(&r.0, &l.0)
+    l.0.len() > r.0.len() && yaql_core::lang::sets::is_subset(&r.0, &l.0)
 });
 yaql_function!(">", gt_null_null(l: Null, r: Null) -> bool { false });
 yaql_function!(">", gt_null_any(l: Null, r: Any) -> bool { false });
@@ -153,7 +155,7 @@ yaql_function!(">", gt_any(l: Any, r: Any) -> bool { false });
 
 // --- ">=" ---
 yaql_function!(">=", gteq_set(l: SetVec, r: SetVec) -> bool {
-    crate::lang::sets::is_subset(&r.0, &l.0)
+    yaql_core::lang::sets::is_subset(&r.0, &l.0)
 });
 yaql_function!(">=", gteq_null_null(l: Null, r: Null) -> bool { true });
 yaql_function!(">=", gteq_null_any(l: Null, r: Any) -> bool { false });
@@ -164,10 +166,10 @@ yaql_function!(">=", gteq_any(l: Any, r: Any) -> bool { false });
 // --- "in" ---
 yaql_function!("in", in_str(l: String, r: String) -> bool { r.contains(l.as_str()) });
 yaql_function!("in", in_arr(l: Any, r: Vec<Primitive>) -> bool {
-    r.iter().any(|e| crate::lang::primitive::primitive_eq(e, &l.0))
+    r.iter().any(|e| yaql_core::lang::primitive_eq(e, &l.0))
 });
 yaql_function!("in", in_set(l: Any, r: SetVec) -> bool {
-    r.0.iter().any(|e| crate::lang::primitive::primitive_eq(e, &l.0))
+    r.0.iter().any(|e| yaql_core::lang::primitive_eq(e, &l.0))
 });
 yaql_function!("in", in_any(l: Any, r: Any) -> bool { false });
 
@@ -176,7 +178,7 @@ yaql_function!(".", dot_map(l: HashMap<String, Primitive>, r: String) -> Primiti
     l.get(&r).cloned().unwrap_or(Primitive::Null)
 });
 yaql_function!(".", dot_arr(l: Vec<Primitive>, r: String) -> Primitive {
-    crate::lang::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
+    crate::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
 });
 yaql_function!(".", dot_any(l: Any, r: Any) -> Primitive { Primitive::Null });
 
@@ -185,7 +187,7 @@ yaql_function!("?.", dot_map_opt(l: HashMap<String, Primitive>, r: String) -> Pr
     l.get(&r).cloned().unwrap_or(Primitive::Null)
 });
 yaql_function!("?.", dot_arr_opt(l: Vec<Primitive>, r: String) -> Primitive {
-    crate::lang::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
+    crate::operators::dot_access_impl(Primitive::Array(l), Primitive::String(r))
 });
 yaql_function!("?.", dot_any_opt(l: Any, r: Any) -> Primitive { Primitive::Null });
 
