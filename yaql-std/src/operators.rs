@@ -3,7 +3,7 @@ use yaql_core::lang::FUNCTIONS;
 use yaql_core::lang::functions::{EvalError, ArgSpec, Type};
 use yaql_core::lang::functions::dispatch;
 use yaql_macros::yaql_function;
-use crate::yaql_raw_function;
+use yaql_macros::yaql_raw_function;
 
 // --- Internal helpers (used by other modules) ---
 
@@ -97,6 +97,7 @@ fn mul_int(l: i64, r: i64) -> i64 { l * r }
 fn mul_num(l: Number, r: Number) -> f64 { l.0 * r.0 }
 
 // --- "/" ---
+#[yaql_raw_function("/", ArgSpec::Exact(2), [Type::Int, Type::Int], false)]
 pub fn div_int(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Int(l) = args[0] else { return Ok(Primitive::Null) };
     let Primitive::Int(r) = args[1] else { return Ok(Primitive::Null) };
@@ -105,8 +106,7 @@ pub fn div_int(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
     }
     Ok(Primitive::Int((l as f64 / r as f64).floor() as i64))
 }
-yaql_raw_function!("/", div_int, ArgSpec::Exact(2), [Type::Int, Type::Int], false);
-
+#[yaql_raw_function("/", ArgSpec::Exact(2), [Type::Number, Type::Number], false)]
 pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let l = match &args[0] {
         Primitive::Int(n) => *n as f64,
@@ -123,8 +123,6 @@ pub fn div_num(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
     }
     Ok(Primitive::Float(l / r))
 }
-yaql_raw_function!("/", div_num, ArgSpec::Exact(2), [Type::Number, Type::Number], false);
-
 // --- "mod" ---
 #[yaql_function("mod")]
 fn mod_int(l: i64, r: i64) -> i64 {

@@ -3,8 +3,9 @@ use yaql_core::lang::functions::EvalError;
 use yaql_core::lang::functions::ArgSpec;
 use yaql_core::lang::functions::Type;
 use yaql_macros::yaql_function;
-use crate::yaql_raw_function;
+use yaql_macros::yaql_raw_function;
 
+#[yaql_raw_function("set", ArgSpec::Varargs, [], false)]
 pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut seen = Vec::new();
     for arg in args {
@@ -12,8 +13,6 @@ pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Res
     }
     Ok(Primitive::Set(seen))
 }
-yaql_raw_function!("set", set_fn, ArgSpec::Varargs, [], false);
-
 #[yaql_function("union")]
 fn union_ss(l: SetVec, r: SetVec) -> SetVec {
     let mut c = l.0;
@@ -51,6 +50,7 @@ fn symdiff_sa(l: SetVec, r: Vec<Primitive>) -> SetVec {
     SetVec(yaql_core::lang::set_symmetric_difference(&l.0, &r))
 }
 
+#[yaql_raw_function("add", ArgSpec::Min(2), [Type::Set], false)]
 pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Set(mut elems) = args[0].clone() else { return Ok(Primitive::Null) };
     for arg in &args[1..] {
@@ -58,8 +58,7 @@ pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
     }
     Ok(Primitive::Set(elems))
 }
-yaql_raw_function!("add", set_add, ArgSpec::Min(2), [Type::Set], false);
-
+#[yaql_raw_function("remove", ArgSpec::Min(2), [Type::Set], false)]
 pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Set(elems) = &args[0] else { return Ok(Primitive::Null) };
     let to_remove = &args[1..];
@@ -69,8 +68,6 @@ pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
         .collect();
     Ok(Primitive::Set(result))
 }
-yaql_raw_function!("remove", set_remove, ArgSpec::Min(2), [Type::Set], false);
-
 #[yaql_function("contains")]
 fn set_contains(elems: SetVec, item: Any) -> bool {
     elems.0.iter().any(|e| yaql_core::lang::primitive_eq(e, &item.0))

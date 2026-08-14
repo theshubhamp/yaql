@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, FnArg, Ident, ItemFn, LitStr, Result};
+use syn::{parse_macro_input, Expr, FnArg, Ident, ItemFn, LitBool, LitStr, Result};
 
 struct YaqlArgs {
     name: LitStr,
@@ -103,6 +103,64 @@ pub fn yaql_function(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
         inventory::submit! { #mod_name::SPEC }
+    };
+
+    expanded.into()
+}
+
+struct YaqlRawArgs {
+    name: LitStr,
+    argspec: Expr,
+    types: Expr,
+    kwargs: LitBool,
+}
+
+impl Parse for YaqlRawArgs {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let name = input.parse()?;
+        input.parse::<syn::Token![,]>()?;
+        let argspec = input.parse()?;
+        input.parse::<syn::Token![,]>()?;
+        let types = input.parse()?;
+        input.parse::<syn::Token![,]>()?;
+        let kwargs = input.parse()?;
+        Ok(YaqlRawArgs {
+            name,
+            argspec,
+            types,
+            kwargs,
+        })
+    }
+}
+
+/// Attribute macro that registers a raw (hand-written) stdlib function.
+///
+/// The function must have the signature
+/// `fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError>`.
+///
+/// Usage:
+/// ```ignore
+/// #[yaql_raw_function("list", ArgSpec::Varargs, [], false)]
+/// pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
+///     Ok(Primitive::Array(args))
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn yaql_raw_function(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as YaqlRawArgs);
+    let func = parse_macro_input!(input as ItemFn);
+
+    let name_lit = args.name;
+    let argspec = args.argspec;
+    let types = args.types;
+    let kwargs = args.kwargs;
+    let fn_name = func.sig.ident.clone();
+
+    let expanded = quote! {
+        #func
+        inventory::submit! {
+            yaql_core::lang::functions::Spec::new(#name_lit, #fn_name, #argspec, &#types, #kwargs)
+        }
     };
 
     expanded.into()

@@ -3,7 +3,7 @@ use yaql_core::lang::functions::EvalError;
 use yaql_core::lang::functions::ArgSpec;
 use yaql_core::lang::functions::Type;
 use yaql_macros::yaql_function;
-use crate::yaql_raw_function;
+use yaql_macros::yaql_raw_function;
 
 #[yaql_function("len")]
 fn len_string(s: String) -> i64 { s.chars().count() as i64 }
@@ -177,6 +177,7 @@ fn replace_str_4(s: String, old: String, new: String, count: i64) -> String {
     if old.is_empty() { s } else { s.replacen(old.as_str(), new.as_str(), count as usize) }
 }
 
+#[yaql_raw_function("replace", ArgSpec::Min(1), [Type::String], true)]
 pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
     let count = if args.len() > 2 {
@@ -221,8 +222,6 @@ pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -
     }
     Ok(Primitive::String(result))
 }
-yaql_raw_function!("replace", replace_dict, ArgSpec::Min(1), [Type::String], true);
-
 // --- substring ---
 
 #[yaql_function("substring")]
@@ -343,6 +342,7 @@ fn last_index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
 
 // --- startsWith / endsWith with varargs ---
 
+#[yaql_raw_function("startsWith", ArgSpec::Min(2), [Type::String], false)]
 pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
@@ -350,8 +350,7 @@ pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primit
     });
     Ok(Primitive::Boolean(result))
 }
-yaql_raw_function!("startsWith", starts_with_varargs, ArgSpec::Min(2), [Type::String], false);
-
+#[yaql_raw_function("endsWith", ArgSpec::Min(2), [Type::String], false)]
 pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
     let result = args[1..].iter().any(|p| {
@@ -359,4 +358,3 @@ pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitiv
     });
     Ok(Primitive::Boolean(result))
 }
-yaql_raw_function!("endsWith", ends_with_varargs, ArgSpec::Min(2), [Type::String], false);

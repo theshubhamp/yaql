@@ -3,7 +3,7 @@ use yaql_core::lang::functions::EvalError;
 use yaql_core::lang::functions::ArgSpec;
 use yaql_core::lang::functions::Type;
 use yaql_macros::yaql_function;
-use crate::yaql_raw_function;
+use yaql_macros::yaql_raw_function;
 use crate::sets;
 use std::collections::HashMap;
 
@@ -51,14 +51,14 @@ fn contains_key_any(m: HashMap<String, Primitive>, _key: Any) -> bool {
     false
 }
 
+#[yaql_raw_function("list", ArgSpec::Varargs, [], false)]
 pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(Primitive::Array(args))
 }
-yaql_raw_function!("list", list_fn, ArgSpec::Varargs, [], false);
-
 #[yaql_function("toList")]
 fn to_list_fn(a: Vec<Primitive>) -> Vec<Primitive> { a }
 
+#[yaql_raw_function("dict", ArgSpec::Varargs, [], true)]
 pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut map = HashMap::new();
     let pairs: Vec<Primitive> = if args.len() == 1 {
@@ -90,8 +90,7 @@ pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Res
     }
     Ok(Primitive::Map(map))
 }
-yaql_raw_function!("dict", dict_fn, ArgSpec::Varargs, [], true);
-
+#[yaql_raw_function("set", ArgSpec::Min(1), [Type::Map], true)]
 pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     if args.len() <= 1 && kwargs.is_empty() {
         return sets::set_fn(args, kwargs);
@@ -125,8 +124,7 @@ pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) ->
     }
     Ok(Primitive::Map(m))
 }
-yaql_raw_function!("set", dict_set_fn, ArgSpec::Min(1), [Type::Map], true);
-
+#[yaql_raw_function("delete", ArgSpec::Min(2), [Type::Map], false)]
 pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
     for arg in &args[1..] {
@@ -141,8 +139,6 @@ pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
     }
     Ok(Primitive::Map(m))
 }
-yaql_raw_function!("delete", dict_delete_fn, ArgSpec::Min(2), [Type::Map], false);
-
 #[yaql_function("deleteAll")]
 fn dict_delete_all_fn(m: HashMap<String, Primitive>, keys: Vec<Primitive>) -> HashMap<String, Primitive> {
     let mut m = m;
@@ -181,11 +177,10 @@ pub fn max_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
+#[yaql_raw_function("max", ArgSpec::Min(1), [Type::Any], false)]
 pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(max_impl(args))
 }
-yaql_raw_function!("max", max_varargs, ArgSpec::Min(1), [Type::Any], false);
-
 #[yaql_function("max")]
 fn max_arr(arr: Vec<Primitive>) -> Primitive { crate::collections::max_impl(arr) }
 
@@ -217,11 +212,10 @@ pub fn min_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
+#[yaql_raw_function("min", ArgSpec::Min(1), [Type::Any], false)]
 pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(min_impl(args))
 }
-yaql_raw_function!("min", min_varargs, ArgSpec::Min(1), [Type::Any], false);
-
 #[yaql_function("min")]
 fn min_arr(arr: Vec<Primitive>) -> Primitive { crate::collections::min_impl(arr) }
 
