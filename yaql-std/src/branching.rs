@@ -3,16 +3,15 @@ use yaql_core::lang::primitive::LambdaBody;
 use yaql_core::lang::functions::{EvalError, ArgSpec, Type};
 use yaql_core::interpreter::eval_lambda;
 use yaql_macros::yaql_function;
-use yaql_macros::yaql_raw_function;
 
-#[yaql_raw_function("switch", ArgSpec::Exact(0), [], true)]
+#[yaql_function("switch", ArgSpec::Exact(0), [], true)]
 pub fn switch(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     for (case, val) in kwargs {
         if truthy(&case) { return Ok(val); }
     }
     Ok(Primitive::Null)
 }
-#[yaql_raw_function("selectCase", ArgSpec::Varargs, [], false)]
+#[yaql_function("selectCase", ArgSpec::Varargs, [], false)]
 pub fn select_case(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut index = 0;
     for pred in args {
@@ -21,7 +20,7 @@ pub fn select_case(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
     }
     Ok(Primitive::Int(index))
 }
-#[yaql_raw_function("selectAllCases", ArgSpec::Varargs, [], false)]
+#[yaql_function("selectAllCases", ArgSpec::Varargs, [], false)]
 pub fn select_all_cases(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut cases = Vec::new();
     for (i, pred) in args.iter().enumerate() {
@@ -29,7 +28,7 @@ pub fn select_all_cases(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive
     }
     Ok(Primitive::Array(cases))
 }
-#[yaql_raw_function("examine", ArgSpec::Varargs, [], false)]
+#[yaql_function("examine", ArgSpec::Varargs, [], false)]
 pub fn examine(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut cases = Vec::new();
     for pred in args {
@@ -42,14 +41,14 @@ fn is_boolean(v: Any) -> bool {
     matches!(v.0, Primitive::Boolean(_))
 }
 
-#[yaql_raw_function("coalesce", ArgSpec::Min(1), [], false)]
+#[yaql_function("coalesce", ArgSpec::Min(1), [], false)]
 pub fn coalesce(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     for arg in args {
         if !matches!(arg, Primitive::Null) { return Ok(arg); }
     }
     Ok(Primitive::Null)
 }
-#[yaql_raw_function("concat", ArgSpec::Varargs, [], false)]
+#[yaql_function("concat", ArgSpec::Varargs, [], false)]
 pub fn concat(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut result = String::new();
     for arg in &args {
@@ -57,7 +56,7 @@ pub fn concat(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Res
     }
     Ok(Primitive::String(result))
 }
-#[yaql_raw_function("concat", ArgSpec::Varargs, [Type::Array], false)]
+#[yaql_function("concat", ArgSpec::Varargs, [Type::Array], false)]
 pub fn concat_arrays(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
     for arg in &args {
@@ -65,7 +64,7 @@ pub fn concat_arrays(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>)
     }
     Ok(Primitive::Array(result))
 }
-#[yaql_raw_function("switchCase", ArgSpec::Min(1), [Type::Int], false)]
+#[yaql_function("switchCase", ArgSpec::Min(1), [Type::Int], false)]
 pub fn switch_case_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Int(index) = &args[0] else { return Ok(Primitive::Null) };
     let cases = &args[1..];
@@ -74,7 +73,7 @@ pub fn switch_case_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
     Ok(cases[idx].clone())
 }
 // let(name => value, ...) -> Map of bindings
-#[yaql_raw_function("let", ArgSpec::Exact(0), [], true)]
+#[yaql_function("let", ArgSpec::Exact(0), [], true)]
 pub fn let_fn(_args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut map = std::collections::HashMap::new();
     for (k, v) in kwargs {
@@ -85,12 +84,12 @@ pub fn let_fn(_args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Res
     Ok(Primitive::Map(map))
 }
 // let(value) -> value (for let($.memorize()) -> ...)
-#[yaql_raw_function("let", ArgSpec::Min(1), [Type::Any], false)]
+#[yaql_function("let", ArgSpec::Min(1), [Type::Any], false)]
 pub fn let_value_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     if args.is_empty() { Ok(Primitive::Null) } else { Ok(args[0].clone()) }
 }
 // with(value) -> value
-#[yaql_raw_function("with", ArgSpec::Min(1), [Type::Any], false)]
+#[yaql_function("with", ArgSpec::Min(1), [Type::Any], false)]
 pub fn with_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     if args.is_empty() { Ok(Primitive::Null) } else { Ok(args[0].clone()) }
 }
@@ -99,7 +98,7 @@ pub fn with_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
 fn memorize(v: Any) -> Primitive { v.0 }
 
 // generateMany: graph traversal
-#[yaql_raw_function("generateMany", ArgSpec::Min(2), [Type::Any, Type::Any], true)]
+#[yaql_function("generateMany", ArgSpec::Min(2), [Type::Any, Type::Any], true)]
 pub fn generate_many_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let start = &args[0];
     let Some(neighbors_lambda) = get_lambda(&args, 1) else { return Ok(Primitive::Null) };

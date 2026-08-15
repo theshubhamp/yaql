@@ -3,7 +3,6 @@ use yaql_core::lang::functions::EvalError;
 use yaql_core::lang::functions::ArgSpec;
 use yaql_core::lang::functions::Type;
 use yaql_macros::yaql_function;
-use yaql_macros::yaql_raw_function;
 use crate::sets;
 use std::collections::HashMap;
 
@@ -51,14 +50,14 @@ fn contains_key_any(m: HashMap<String, Primitive>, _key: Any) -> bool {
     false
 }
 
-#[yaql_raw_function("list", ArgSpec::Varargs, [], false)]
+#[yaql_function("list", ArgSpec::Varargs, [], false)]
 pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(Primitive::Array(args))
 }
 #[yaql_function("toList")]
 fn to_list_fn(a: Vec<Primitive>) -> Vec<Primitive> { a }
 
-#[yaql_raw_function("dict", ArgSpec::Varargs, [], true)]
+#[yaql_function("dict", ArgSpec::Varargs, [], true)]
 pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let mut map = HashMap::new();
     let pairs: Vec<Primitive> = if args.len() == 1 {
@@ -90,7 +89,7 @@ pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Res
     }
     Ok(Primitive::Map(map))
 }
-#[yaql_raw_function("set", ArgSpec::Min(1), [Type::Map], true)]
+#[yaql_function("set", ArgSpec::Min(1), [Type::Map], true)]
 pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     if args.len() <= 1 && kwargs.is_empty() {
         return sets::set_fn(args, kwargs);
@@ -124,7 +123,7 @@ pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) ->
     }
     Ok(Primitive::Map(m))
 }
-#[yaql_raw_function("delete", ArgSpec::Min(2), [Type::Map], false)]
+#[yaql_function("delete", ArgSpec::Min(2), [Type::Map], false)]
 pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
     for arg in &args[1..] {
@@ -177,7 +176,7 @@ pub fn max_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-#[yaql_raw_function("max", ArgSpec::Min(1), [Type::Any], false)]
+#[yaql_function("max", ArgSpec::Min(1), [Type::Any], false)]
 pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(max_impl(args))
 }
@@ -212,7 +211,7 @@ pub fn min_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-#[yaql_raw_function("min", ArgSpec::Min(1), [Type::Any], false)]
+#[yaql_function("min", ArgSpec::Min(1), [Type::Any], false)]
 pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
     Ok(min_impl(args))
 }
