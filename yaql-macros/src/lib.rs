@@ -2,108 +2,79 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, FnArg, Ident, ItemFn, LitBool, LitStr, Result};
+use syn::{parse_macro_input, FnArg, Ident, ItemFn, LitStr, Result};
 
 struct YaqlArgs {
     name: LitStr,
-    argspec: Option<Expr>,
-    types: Option<Expr>,
-    kwargs: Option<LitBool>,
 }
 
 impl Parse for YaqlArgs {
     fn parse(input: ParseStream) -> Result<Self> {
         let name = input.parse()?;
-        let mut argspec = None;
-        let mut types = None;
-        let mut kwargs = None;
-        while input.peek(syn::Token![,]) {
-            let _: syn::Token![,] = input.parse()?;
-            if argspec.is_none() {
-                argspec = Some(input.parse()?);
-            } else if types.is_none() {
-                types = Some(input.parse()?);
-            } else if kwargs.is_none() {
-                kwargs = Some(input.parse()?);
-            } else {
-                return Err(input.error("too many arguments to yaql_function"));
-            }
-        }
-        Ok(YaqlArgs { name, argspec, types, kwargs })
+        Ok(YaqlArgs { name })
     }
 }
 
-fn is_raw_signature(func: &ItemFn) -> bool {
-    let mut params = func.sig.inputs.iter();
-    let first = match params.next() {
-        Some(FnArg::Typed(p)) => p,
-        _ => return false,
-    };
-    let second = match params.next() {
-        Some(FnArg::Typed(p)) => p,
-        _ => return false,
-    };
-    if params.next().is_some() {
-        return false;
+fn ty_str(t: &syn::Type) -> String {
+    quote::ToTokens::to_token_stream(t).to_string().replace(' ', "")
+}
+
+/// If `t` is `Varargs<N>`, return `Some(N)`; otherwise `None`.
+fn varargs_min(t: &syn::Type) -> Option<usize> {
+    if let syn::Type::Path(tp) = t {
+        let seg = tp.path.segments.last()?;
+        if seg.ident != "Varargs" {
+            return None;
+        }
+        if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
+            if let Some(syn::GenericArgument::Const(expr)) = args.args.first() {
+                if let syn::Expr::Lit(lit) = expr {
+                    if let syn::Lit::Int(n) = &lit.lit {
+                        return n.base10_parse::<usize>().ok();
+                    }
+                }
+            }
+        }
     }
-    let ty_str = |t: &syn::Type| -> String {
-        quote::ToTokens::to_token_stream(t).to_string().replace(' ', "")
-    };
-    ty_str(&first.ty) == "Vec<Primitive>"
-        && ty_str(&second.ty) == "Vec<(Primitive,Primitive)>"
-        && matches!(func.sig.output, syn::ReturnType::Default)
+    None
+}
+
+fn is_result_type(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(tp) = ty {
+        if let Some(seg) = tp.path.segments.last() {
+            return seg.ident == "Result";
+        }
+    }
+    false
 }
 
 /// Attribute macro that registers a stdlib function.
 ///
-/// Two forms are supported, dispatched automatically:
+/// The spec (name, arity, arg types, kwargs) is inferred entirely from the Rust
+/// signature. Each fixed param must implement `FromPrimitive` and the return
+/// type must implement `IntoPrimitive` (or be `Result<T, EvalError>`).
 ///
-/// 1. **Typed** — the spec (name, arity, arg types, kwargs) is inferred from the
-///    Rust signature. Each param must implement `FromPrimitive` and the return
-///    type must implement `IntoPrimitive`.
-///    ```ignore
-///    #[yaql_function("abs")]
-///    fn abs_int(n: i64) -> i64 { n.abs() }
-///    ```
+/// Special trailing params:
+/// - `Varargs<N>` — accept extra args, requiring at least `N` of them (yields
+///   `ArgSpec::Varargs` for `Varargs<0>` with no fixed params, otherwise
+///   `ArgSpec::Min(fixed_count + N)`).
+/// - `Kwargs` — accept keyword arguments (sets `kwargs: true`).
 ///
-/// 2. **Raw** — provide `argspec`, `arg_types`, and `kwargs` explicitly and give
-///    the function a raw signature:
-///    `fn(Vec<Primitive>, Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError>`.
-///    ```ignore
-///    #[yaql_function("list", ArgSpec::Varargs, [], false)]
-///    pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-///        Ok(Primitive::Array(args))
-///    }
-///    ```
+/// ```ignore
+/// #[yaql_function("abs")]
+/// fn abs_int(n: i64) -> i64 { n.abs() }
+///
+/// #[yaql_function("list")]
+/// fn list_fn(args: Varargs<0>) -> Vec<Primitive> { args.0 }
+///
+/// #[yaql_function("dict")]
+/// fn dict_fn(args: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> { ... }
+/// ```
 #[proc_macro_attribute]
 pub fn yaql_function(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as YaqlArgs);
     let func = parse_macro_input!(input as ItemFn);
-
-    if args.argspec.is_some() || is_raw_signature(&func) {
-        raw_impl(args, func)
-    } else {
-        typed_impl(args, func)
-    }
-}
-
-fn raw_impl(args: YaqlArgs, func: ItemFn) -> TokenStream {
-    let name_lit = args.name;
-    let argspec = args
-        .argspec
-        .expect("raw yaql_function requires an ArgSpec expression");
-    let types = args.types.unwrap_or_else(|| syn::parse_quote! { [] });
-    let kwargs = args.kwargs.unwrap_or_else(|| LitBool::new(false, proc_macro2::Span::call_site()));
-    let fn_name = func.sig.ident.clone();
-
-    let expanded = quote! {
-        #func
-        inventory::submit! {
-            yaql_core::lang::functions::Spec::new(#name_lit, #fn_name, #argspec, &#types, #kwargs)
-        }
-    };
-
-    expanded.into()
+    typed_impl(args, func)
 }
 
 fn typed_impl(args: YaqlArgs, func: ItemFn) -> TokenStream {
@@ -122,6 +93,9 @@ fn typed_impl(args: YaqlArgs, func: ItemFn) -> TokenStream {
 
     let mut arg_idents: Vec<Ident> = Vec::new();
     let mut arg_tys: Vec<syn::Type> = Vec::new();
+    let mut rest_min: Option<usize> = None;
+    let mut has_kwargs = false;
+
     for input in &func.sig.inputs {
         match input {
             FnArg::Receiver(_) => {
@@ -144,41 +118,118 @@ fn typed_impl(args: YaqlArgs, func: ItemFn) -> TokenStream {
                         .into();
                     }
                 };
-                arg_idents.push(ident);
-                arg_tys.push((*pat_ty.ty).clone());
+                let ty = (*pat_ty.ty).clone();
+                if let Some(min) = varargs_min(&ty) {
+                    if rest_min.is_some() {
+                        return syn::Error::new(
+                            pat_ty.span(),
+                            "yaql_function cannot have more than one Varargs param",
+                        )
+                        .to_compile_error()
+                        .into();
+                    }
+                    rest_min = Some(min);
+                    arg_idents.push(ident);
+                    arg_tys.push(ty);
+                } else if ty_str(&ty) == "Kwargs" {
+                    if has_kwargs {
+                        return syn::Error::new(
+                            pat_ty.span(),
+                            "yaql_function cannot have more than one Kwargs param",
+                        )
+                        .to_compile_error()
+                        .into();
+                    }
+                    has_kwargs = true;
+                    arg_idents.push(ident);
+                    arg_tys.push(ty);
+                } else {
+                    arg_idents.push(ident);
+                    arg_tys.push(ty);
+                }
             }
         }
     }
 
-    let arity = arg_idents.len();
-    let body = &func.block;
+    let fixed_count = arg_tys
+        .iter()
+        .filter(|t| varargs_min(t).is_none() && ty_str(t) != "Kwargs")
+        .count();
+
+    let argspec = match rest_min {
+        Some(min) => {
+            let n = syn::Index::from(fixed_count + min);
+            if fixed_count == 0 && min == 0 {
+                quote! { ArgSpec::Varargs }
+            } else {
+                quote! { ArgSpec::Min(#n) }
+            }
+        }
+        _ => {
+            let n = syn::Index::from(fixed_count);
+            quote! { ArgSpec::Exact(#n) }
+        }
+    };
+
     let type_array = arg_tys
         .iter()
+        .filter(|t| varargs_min(t).is_none() && ty_str(t) != "Kwargs")
         .map(|ty| quote! { <#ty as FromPrimitive>::TYPE });
-    let unpack = arg_idents
-        .iter()
-        .zip(arg_tys.iter())
-        .enumerate()
-        .map(|(i, (ident, ty))| {
-            let i = syn::Index::from(i);
-            quote! {
+
+    let mut unpack = Vec::new();
+    let mut fixed_idx = 0usize;
+    for (ident, ty) in arg_idents.iter().zip(arg_tys.iter()) {
+        if let Some(min) = varargs_min(ty) {
+            let i = syn::Index::from(fixed_count);
+            let min = syn::Index::from(min);
+            unpack.push(quote! {
+                let #ident = Varargs::<#min>(args[#i..].to_vec());
+            });
+        } else if ty_str(ty) == "Kwargs" {
+            unpack.push(quote! {
+                let #ident = Kwargs(kwargs);
+            });
+        } else {
+            let i = syn::Index::from(fixed_idx);
+            unpack.push(quote! {
                 let #ident = match <#ty as FromPrimitive>::from_primitive(&args[#i]) {
                     Some(v) => v,
                     None => return Ok(Primitive::Null),
                 };
+            });
+            fixed_idx += 1;
+        }
+    }
+
+    let kwargs_lit = has_kwargs;
+
+    let call = if is_result_type(&ret_ty) {
+        quote! {
+            let __ret: #ret_ty = super::#fn_name(#(#arg_idents),*);
+            match __ret {
+                Ok(v) => Ok(IntoPrimitive::into_primitive(v)),
+                Err(e) => Err(e),
             }
-        })
-        .collect::<Vec<_>>();
+        }
+    } else {
+        quote! {
+            let __ret: #ret_ty = super::#fn_name(#(#arg_idents),*);
+            Ok(IntoPrimitive::into_primitive(__ret))
+        }
+    };
 
     let expanded = quote! {
+        #func
         #[allow(non_camel_case_types)]
         mod #mod_name {
+            use super::*;
             use yaql_core::lang::functions::*;
-            pub const SPEC: Spec = Spec::new(#name_lit, func, ArgSpec::Exact(#arity), &[#(#type_array),*], false);
-            pub fn func(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
+            use yaql_core::lang::*;
+            use yaql_core::interpreter::*;
+            pub const SPEC: Spec = Spec::new(#name_lit, func, #argspec, &[#(#type_array),*], #kwargs_lit);
+            pub fn func(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
                 #(#unpack)*
-                let __ret: #ret_ty = #body;
-                Ok(IntoPrimitive::into_primitive(__ret))
+                #call
             }
         }
         inventory::submit! { #mod_name::SPEC }

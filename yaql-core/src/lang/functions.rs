@@ -172,6 +172,13 @@ impl FromPrimitive for Number {
 
 pub struct SetVec(pub Vec<Primitive>);
 
+/// Trailing varargs (at least `MIN` extra args). Used by the `#[yaql_function]`
+/// macro. `Varargs<0>` accepts 0+ extra args; `Varargs<1>` requires 1+.
+pub struct Varargs<const MIN: usize>(pub Vec<Primitive>);
+
+/// Keyword arguments. Used by the `#[yaql_function]` macro.
+pub struct Kwargs(pub Vec<(Primitive, Primitive)>);
+
 pub struct Any(pub Primitive);
 impl FromPrimitive for Any {
     const TYPE: Type = Type::Any;

@@ -1,16 +1,14 @@
 use yaql_core::lang::Primitive;
-use yaql_core::lang::functions::EvalError;
-use yaql_core::lang::functions::ArgSpec;
-use yaql_core::lang::functions::Type;
+use yaql_core::lang::functions::{SetVec, Varargs, Any};
 use yaql_macros::yaql_function;
 
-#[yaql_function("set", ArgSpec::Varargs, [], false)]
-pub fn set_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
+#[yaql_function("set")]
+pub fn set_fn(args: Varargs<0>) -> SetVec {
     let mut seen = Vec::new();
-    for arg in args {
+    for arg in args.0 {
         yaql_core::lang::set_push_unique(&mut seen, &arg);
     }
-    Ok(Primitive::Set(seen))
+    SetVec(seen)
 }
 #[yaql_function("union")]
 fn union_ss(l: SetVec, r: SetVec) -> SetVec {
@@ -49,23 +47,22 @@ fn symdiff_sa(l: SetVec, r: Vec<Primitive>) -> SetVec {
     SetVec(yaql_core::lang::set_symmetric_difference(&l.0, &r))
 }
 
-#[yaql_function("add", ArgSpec::Min(2), [Type::Set], false)]
-pub fn set_add(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::Set(mut elems) = args[0].clone() else { return Ok(Primitive::Null) };
-    for arg in &args[1..] {
+#[yaql_function("add")]
+pub fn set_add(elems: SetVec, rest: Varargs<1>) -> SetVec {
+    let mut elems = elems.0;
+    for arg in &rest.0 {
         yaql_core::lang::set_push_unique(&mut elems, arg);
     }
-    Ok(Primitive::Set(elems))
+    SetVec(elems)
 }
-#[yaql_function("remove", ArgSpec::Min(2), [Type::Set], false)]
-pub fn set_remove(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::Set(elems) = &args[0] else { return Ok(Primitive::Null) };
-    let to_remove = &args[1..];
-    let result: Vec<Primitive> = elems.iter()
+#[yaql_function("remove")]
+pub fn set_remove(elems: SetVec, rest: Varargs<1>) -> SetVec {
+    let to_remove = &rest.0;
+    let result: Vec<Primitive> = elems.0.iter()
         .filter(|e| !to_remove.iter().any(|r| yaql_core::lang::primitive_eq(e, r)))
         .cloned()
         .collect();
-    Ok(Primitive::Set(result))
+    SetVec(result)
 }
 #[yaql_function("contains")]
 fn set_contains(elems: SetVec, item: Any) -> bool {

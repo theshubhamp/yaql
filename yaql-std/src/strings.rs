@@ -1,7 +1,5 @@
 use yaql_core::lang::Primitive;
-use yaql_core::lang::functions::EvalError;
-use yaql_core::lang::functions::ArgSpec;
-use yaql_core::lang::functions::Type;
+use yaql_core::lang::functions::{EvalError, Varargs, Kwargs, Any, Null, SetVec};
 use yaql_macros::yaql_function;
 
 #[yaql_function("len")]
@@ -176,18 +174,17 @@ fn replace_str_4(s: String, old: String, new: String, count: i64) -> String {
     if old.is_empty() { s } else { s.replacen(old.as_str(), new.as_str(), count as usize) }
 }
 
-#[yaql_function("replace", ArgSpec::Min(1), [Type::String], true)]
-pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Null) };
-    let count = if args.len() > 2 {
-        if let Primitive::Int(c) = &args[2] { Some(*c) } else { None }
+#[yaql_function("replace")]
+pub fn replace_dict(s: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+    let count = if rest.0.len() > 1 {
+        if let Primitive::Int(c) = &rest.0[1] { Some(*c) } else { None }
     } else { None };
 
-    let dict = if let Some(Primitive::Map(m)) = args.get(1) {
+    let dict = if let Some(Primitive::Map(m)) = rest.0.get(0) {
         Some(m.clone())
-    } else if kwargs.iter().any(|(k, _)| matches!(k, Primitive::String(_))) {
+    } else if kwargs.0.iter().any(|(k, _)| matches!(k, Primitive::String(_))) {
         let mut map = std::collections::HashMap::new();
-        for (k, v) in &kwargs {
+        for (k, v) in &kwargs.0 {
             if let Primitive::String(key) = k {
                 map.insert(key.clone(), v.clone());
             }
@@ -196,8 +193,8 @@ pub fn replace_dict(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -
     } else { None };
 
     if dict.is_none() {
-        let Primitive::String(old) = &args[1] else { return Ok(Primitive::String(s.clone())); };
-        let Primitive::String(new) = &args[2] else { return Ok(Primitive::String(s.clone())); };
+        let Primitive::String(old) = &rest.0[0] else { return Ok(Primitive::String(s.clone())); };
+        let Primitive::String(new) = &rest.0[1] else { return Ok(Primitive::String(s.clone())); };
         if old.is_empty() { return Ok(Primitive::String(s.clone())); }
         let result = if let Some(c) = count {
             s.replacen(old.as_str(), new.as_str(), c as usize)
@@ -341,19 +338,15 @@ fn last_index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
 
 // --- startsWith / endsWith with varargs ---
 
-#[yaql_function("startsWith", ArgSpec::Min(2), [Type::String], false)]
-pub fn starts_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
-    let result = args[1..].iter().any(|p| {
+#[yaql_function("startsWith")]
+pub fn starts_with_varargs(s: String, rest: Varargs<1>) -> bool {
+    rest.0.iter().any(|p| {
         if let Primitive::String(prefix) = p { s.starts_with(prefix.as_str()) } else { false }
-    });
-    Ok(Primitive::Boolean(result))
+    })
 }
-#[yaql_function("endsWith", ArgSpec::Min(2), [Type::String], false)]
-pub fn ends_with_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::String(s) = &args[0] else { return Ok(Primitive::Boolean(false)) };
-    let result = args[1..].iter().any(|p| {
+#[yaql_function("endsWith")]
+pub fn ends_with_varargs(s: String, rest: Varargs<1>) -> bool {
+    rest.0.iter().any(|p| {
         if let Primitive::String(suffix) = p { s.ends_with(suffix.as_str()) } else { false }
-    });
-    Ok(Primitive::Boolean(result))
+    })
 }

@@ -1,9 +1,6 @@
 use yaql_core::lang::{Primitive, compare};
-use yaql_core::lang::functions::EvalError;
-use yaql_core::lang::functions::ArgSpec;
-use yaql_core::lang::functions::Type;
+use yaql_core::lang::functions::{EvalError, Varargs, Kwargs, Any, SetVec};
 use yaql_macros::yaql_function;
-use crate::sets;
 use std::collections::HashMap;
 
 #[yaql_function("get")]
@@ -50,19 +47,19 @@ fn contains_key_any(m: HashMap<String, Primitive>, _key: Any) -> bool {
     false
 }
 
-#[yaql_function("list", ArgSpec::Varargs, [], false)]
-pub fn list_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    Ok(Primitive::Array(args))
+#[yaql_function("list")]
+pub fn list_fn(args: Varargs<0>) -> Vec<Primitive> {
+    args.0
 }
 #[yaql_function("toList")]
 fn to_list_fn(a: Vec<Primitive>) -> Vec<Primitive> { a }
 
-#[yaql_function("dict", ArgSpec::Varargs, [], true)]
-pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
+#[yaql_function("dict")]
+pub fn dict_fn(args: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
     let mut map = HashMap::new();
-    let pairs: Vec<Primitive> = if args.len() == 1 {
-        if let Primitive::Array(a) = &args[0] { a.clone() } else { args }
-    } else { args };
+    let pairs: Vec<Primitive> = if args.0.len() == 1 {
+        if let Primitive::Array(a) = &args.0[0] { a.clone() } else { args.0 }
+    } else { args.0 };
     for arg in &pairs {
         if let Primitive::Array(pair) = arg {
             if pair.len() == 2 {
@@ -77,7 +74,7 @@ pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Res
             }
         }
     }
-    for (k, v) in kwargs {
+    for (k, v) in kwargs.0 {
         let key = match k {
             Primitive::String(s) => s,
             Primitive::Int(n) => n.to_string(),
@@ -89,29 +86,29 @@ pub fn dict_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Res
     }
     Ok(Primitive::Map(map))
 }
-#[yaql_function("set", ArgSpec::Min(1), [Type::Map], true)]
-pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    if args.len() <= 1 && kwargs.is_empty() {
-        return sets::set_fn(args, kwargs);
+#[yaql_function("set")]
+pub fn dict_set_fn(m: HashMap<String, Primitive>, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+    if rest.0.is_empty() && kwargs.0.is_empty() {
+        return Ok(Primitive::Set(crate::sets::set_fn(Varargs::<0>(vec![Primitive::Map(m)])).0));
     }
-    let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
-    if args.len() == 3 {
-        let key = match &args[1] {
+    let mut m = m;
+    if rest.0.len() == 2 {
+        let key = match &rest.0[0] {
             Primitive::String(s) => s.clone(),
             Primitive::Int(n) => n.to_string(),
             Primitive::Boolean(b) => b.to_string(),
             Primitive::Null => "null".to_string(),
             _ => return Ok(Primitive::Null),
         };
-        m.insert(key, args[2].clone());
-    } else if args.len() == 2 {
-        if let Primitive::Map(other) = &args[1] {
+        m.insert(key, rest.0[1].clone());
+    } else if rest.0.len() == 1 {
+        if let Primitive::Map(other) = &rest.0[0] {
             for (k, v) in other {
                 m.insert(k.clone(), v.clone());
             }
         }
     }
-    for (k, v) in kwargs {
+    for (k, v) in kwargs.0 {
         let key = match k {
             Primitive::String(s) => s,
             Primitive::Int(n) => n.to_string(),
@@ -123,10 +120,10 @@ pub fn dict_set_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) ->
     }
     Ok(Primitive::Map(m))
 }
-#[yaql_function("delete", ArgSpec::Min(2), [Type::Map], false)]
-pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let Primitive::Map(mut m) = args[0].clone() else { return Ok(Primitive::Null) };
-    for arg in &args[1..] {
+#[yaql_function("delete")]
+pub fn dict_delete_fn(m: HashMap<String, Primitive>, rest: Varargs<1>) -> HashMap<String, Primitive> {
+    let mut m = m;
+    for arg in &rest.0 {
         let key = match arg {
             Primitive::String(s) => s.clone(),
             Primitive::Int(n) => n.to_string(),
@@ -136,7 +133,7 @@ pub fn dict_delete_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
         };
         m.remove(&key);
     }
-    Ok(Primitive::Map(m))
+    m
 }
 #[yaql_function("deleteAll")]
 fn dict_delete_all_fn(m: HashMap<String, Primitive>, keys: Vec<Primitive>) -> HashMap<String, Primitive> {
@@ -176,9 +173,9 @@ pub fn max_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-#[yaql_function("max", ArgSpec::Min(1), [Type::Any], false)]
-pub fn max_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    Ok(max_impl(args))
+#[yaql_function("max")]
+pub fn max_varargs(args: Varargs<1>) -> Primitive {
+    max_impl(args.0)
 }
 #[yaql_function("max")]
 fn max_arr(arr: Vec<Primitive>) -> Primitive { crate::collections::max_impl(arr) }
@@ -188,13 +185,13 @@ fn max_set(arr: SetVec) -> Primitive { crate::collections::max_impl(arr.0) }
 
 #[yaql_function("max")]
 fn max_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
-    if arr.is_empty() { return Ok(default.0) }
+    if arr.is_empty() { return default.0 }
     crate::collections::max_impl(arr)
 }
 
 #[yaql_function("max")]
 fn max_set_default(arr: SetVec, default: Any) -> Primitive {
-    if arr.0.is_empty() { return Ok(default.0) }
+    if arr.0.is_empty() { return default.0 }
     crate::collections::max_impl(arr.0)
 }
 
@@ -211,9 +208,9 @@ pub fn min_impl(iter: Vec<Primitive>) -> Primitive {
     result.unwrap_or(Primitive::Null)
 }
 
-#[yaql_function("min", ArgSpec::Min(1), [Type::Any], false)]
-pub fn min_varargs(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    Ok(min_impl(args))
+#[yaql_function("min")]
+pub fn min_varargs(args: Varargs<1>) -> Primitive {
+    min_impl(args.0)
 }
 #[yaql_function("min")]
 fn min_arr(arr: Vec<Primitive>) -> Primitive { crate::collections::min_impl(arr) }
@@ -223,13 +220,13 @@ fn min_set(arr: SetVec) -> Primitive { crate::collections::min_impl(arr.0) }
 
 #[yaql_function("min")]
 fn min_arr_default(arr: Vec<Primitive>, default: Any) -> Primitive {
-    if arr.is_empty() { return Ok(default.0) }
+    if arr.is_empty() { return default.0 }
     crate::collections::min_impl(arr)
 }
 
 #[yaql_function("min")]
 fn min_set_default(arr: SetVec, default: Any) -> Primitive {
-    if arr.0.is_empty() { return Ok(default.0) }
+    if arr.0.is_empty() { return default.0 }
     crate::collections::min_impl(arr.0)
 }
 

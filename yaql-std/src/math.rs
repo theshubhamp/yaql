@@ -1,3 +1,5 @@
+use yaql_core::lang::Primitive;
+use yaql_core::lang::functions::{Number, Any, Null};
 use yaql_macros::yaql_function;
 
 #[yaql_function("abs")]

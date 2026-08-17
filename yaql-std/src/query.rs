@@ -1,10 +1,10 @@
 use yaql_core::lang::Primitive;
 use yaql_core::lang::primitive::LambdaBody;
 use yaql_macros::yaql_function;
-use yaql_core::lang::functions::ArgSpec;
-use yaql_core::lang::functions::Type;
+use yaql_core::lang::functions::{EvalError, Varargs, Kwargs, Any, SetVec};
 use yaql_core::interpreter::eval_lambda;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 // Thread-local storage for sort keys (for thenBy/thenByDescending)
 // Each element's sort key is a Vec<Primitive> (multiple sort keys compound)
@@ -116,12 +116,11 @@ fn range_three(start: i64, end: i64, step: i64) -> Option<Vec<Primitive>> {
     }
 }
 
-#[yaql_function("append", ArgSpec::Min(1), [Type::Array], false)]
-pub fn append(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Some(Primitive::Array(arr)) = args.first() else { return Ok(Primitive::Null) };
-    let mut result = arr.clone();
-    result.extend(args[1..].iter().cloned());
-    Ok(Primitive::Array(result))
+#[yaql_function("append")]
+pub fn append(arr: Vec<Primitive>, rest: Varargs<0>) -> Vec<Primitive> {
+    let mut result = arr;
+    result.extend(rest.0);
+    result
 }
 #[yaql_function("reverse")]
 fn reverse_array(arr: Vec<Primitive>) -> Vec<Primitive> {
@@ -239,37 +238,31 @@ fn get_lambda(args: &[Primitive], idx: usize) -> Option<&LambdaBody> {
 }
 
 // where: array.where(predicate) -> filtered array
-#[yaql_function("where", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("where")]
+pub fn where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
-    for e in arr {
-        if yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+    for e in &arr {
+        if yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             result.push(e.clone());
         }
     }
     Ok(Primitive::Array(result))
 }
 // select: array.select(selector) -> mapped array
-#[yaql_function("select", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn select_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("select")]
+pub fn select_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
-    for e in arr {
-        result.push(eval_lambda(lambda, e.clone())?);
+    for e in &arr {
+        result.push(eval_lambda(&lambda, e.clone())?);
     }
     Ok(Primitive::Array(result))
 }
 // selectMany: array.selectMany(selector) -> flatMap
-#[yaql_function("selectMany", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn select_many_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("selectMany")]
+pub fn select_many_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
-    for e in arr {
-        match eval_lambda(lambda, e.clone())? {
+    for e in &arr {
+        match eval_lambda(&lambda, e.clone())? {
             Primitive::Array(sub) => result.extend(sub),
             other => result.push(other),
         }
@@ -290,13 +283,11 @@ fn select_many_constant(arr: Vec<Primitive>, constant: Any) -> Vec<Primitive> {
 }
 
 // orderBy: array.orderBy(selector) -> sorted array (stores sort keys for thenBy)
-#[yaql_function("orderBy", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn order_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("orderBy")]
+pub fn order_by_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut keyed: Vec<(Primitive, Primitive)> = Vec::new();
-    for e in arr {
-        keyed.push((eval_lambda(lambda, e.clone())?, e.clone()));
+    for e in &arr {
+        keyed.push((eval_lambda(&lambda, e.clone())?, e.clone()));
     }
     let mut indices: Vec<usize> = (0..keyed.len()).collect();
     indices.sort_by(|&a, &b| yaql_core::lang::compare(&keyed[a].0, &keyed[b].0));
@@ -316,13 +307,11 @@ fn order_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
 }
 
 // orderByDescending
-#[yaql_function("orderByDescending", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn order_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("orderByDescending")]
+pub fn order_by_desc_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut keyed: Vec<(Primitive, Primitive)> = Vec::new();
-    for e in arr {
-        keyed.push((eval_lambda(lambda, e.clone())?, e.clone()));
+    for e in &arr {
+        keyed.push((eval_lambda(&lambda, e.clone())?, e.clone()));
     }
     let mut indices: Vec<usize> = (0..keyed.len()).collect();
     indices.sort_by(|&a, &b| yaql_core::lang::compare(&keyed[b].0, &keyed[a].0));
@@ -342,13 +331,11 @@ fn order_by_desc_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
 }
 
 // thenBy (compound sort: sort by new key, tiebreak by previous keys)
-#[yaql_function("thenBy", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("thenBy")]
+pub fn then_by_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut new_keys: Vec<Primitive> = Vec::new();
-    for e in arr {
-        new_keys.push(eval_lambda(lambda, e.clone())?);
+    for e in &arr {
+        new_keys.push(eval_lambda(&lambda, e.clone())?);
     }
     let (prev_keys, prev_desc) = load_sort_keys();
     let has_prev = prev_keys.len() == new_keys.len();
@@ -375,13 +362,11 @@ pub fn then_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) ->
 #[yaql_function("thenBy")]
 fn then_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> { arr }
 
-#[yaql_function("thenByDescending", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn then_by_desc_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("thenByDescending")]
+pub fn then_by_desc_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut new_keys: Vec<Primitive> = Vec::new();
-    for e in arr {
-        new_keys.push(eval_lambda(lambda, e.clone())?);
+    for e in &arr {
+        new_keys.push(eval_lambda(&lambda, e.clone())?);
     }
     let (prev_keys, prev_desc) = load_sort_keys();
     let has_prev = prev_keys.len() == new_keys.len();
@@ -421,38 +406,32 @@ pub fn compare_key_vectors_with_desc(a: &[Primitive], b: &[Primitive], desc: &[b
 }
 
 // takeWhile
-#[yaql_function("takeWhile", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn take_while_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("takeWhile")]
+pub fn take_while_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
-    for e in arr {
-        if !yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) { break; }
+    for e in &arr {
+        if !yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) { break; }
         result.push(e.clone());
     }
     Ok(Primitive::Array(result))
 }
 // skipWhile
-#[yaql_function("skipWhile", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn skip_while_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("skipWhile")]
+pub fn skip_while_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
     let mut skipping = true;
-    for e in arr {
-        if skipping && yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) { continue; }
+    for e in &arr {
+        if skipping && yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) { continue; }
         skipping = false;
         result.push(e.clone());
     }
     Ok(Primitive::Array(result))
 }
 // any with predicate
-#[yaql_function("any", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn any_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
-    for e in arr {
-        if yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+#[yaql_function("any")]
+pub fn any_pred_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
+    for e in &arr {
+        if yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             return Ok(Primitive::Boolean(true));
         }
     }
@@ -464,12 +443,10 @@ fn any_identity(arr: Vec<Primitive>, _any: Any) -> bool {
 }
 
 // all with predicate
-#[yaql_function("all", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn all_pred_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
-    for e in arr {
-        if !yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+#[yaql_function("all")]
+pub fn all_pred_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
+    for e in &arr {
+        if !yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             return Ok(Primitive::Boolean(false));
         }
     }
@@ -481,14 +458,12 @@ fn all_identity(arr: Vec<Primitive>, _any: Any) -> bool {
 }
 
 // distinct with selector
-#[yaql_function("distinct", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn distinct_sel_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("distinct")]
+pub fn distinct_sel_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut seen_keys = Vec::new();
     let mut result = Vec::new();
-    for e in arr {
-        let key = eval_lambda(lambda, e.clone())?;
+    for e in &arr {
+        let key = eval_lambda(&lambda, e.clone())?;
         if !seen_keys.iter().any(|k| yaql_core::lang::primitive_eq(k, &key)) {
             seen_keys.push(key);
             result.push(e.clone());
@@ -506,12 +481,10 @@ fn distinct_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
 }
 
 // indexWhere
-#[yaql_function("indexWhere", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("indexWhere")]
+pub fn index_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     for (i, e) in arr.iter().enumerate() {
-        if yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+        if yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             return Ok(Primitive::Int(i as i64));
         }
     }
@@ -521,12 +494,10 @@ pub fn index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
 fn index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 }
 
 // lastIndexWhere
-#[yaql_function("lastIndexWhere", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn last_index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("lastIndexWhere")]
+pub fn last_index_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     for (i, e) in arr.iter().enumerate().rev() {
-        if yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+        if yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             return Ok(Primitive::Int(i as i64));
         }
     }
@@ -536,58 +507,46 @@ pub fn last_index_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primit
 fn last_index_where_identity(_arr: Vec<Primitive>, _any: Any) -> i64 { -1 }
 
 // aggregate: array.aggregate(func) or array.aggregate(func, init)
-#[yaql_function("aggregate", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn aggregate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("aggregate")]
+pub fn aggregate_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     if arr.is_empty() { return Ok(Primitive::Null); }
     let mut acc = arr[0].clone();
     for e in &arr[1..] {
-        acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+        acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
     }
     Ok(acc)
 }
-#[yaql_function("aggregate", ArgSpec::Exact(3), [Type::Array, Type::Lambda, Type::Any], false)]
-pub fn aggregate_init_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
-    let init = args.get(2).cloned().unwrap_or(Primitive::Null);
-    if arr.is_empty() { return Ok(init); }
-    let mut acc = init;
-    for e in arr {
-        acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+#[yaql_function("aggregate")]
+pub fn aggregate_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Result<Primitive, EvalError> {
+    if arr.is_empty() { return Ok(init.0); }
+    let mut acc = init.0;
+    for e in &arr {
+        acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
     }
     Ok(acc)
 }
 // reduce (same as aggregate)
-#[yaql_function("reduce", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn reduce_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("reduce")]
+pub fn reduce_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     if arr.is_empty() { return Ok(Primitive::Null); }
     let mut acc = arr[0].clone();
     for e in &arr[1..] {
-        acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+        acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
     }
     Ok(acc)
 }
-#[yaql_function("reduce", ArgSpec::Exact(3), [Type::Array, Type::Lambda, Type::Any], false)]
-pub fn reduce_init_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
-    let init = args.get(2).cloned().unwrap_or(Primitive::Null);
-    if arr.is_empty() { return Ok(init); }
-    let mut acc = init;
-    for e in arr {
-        acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+#[yaql_function("reduce")]
+pub fn reduce_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Result<Primitive, EvalError> {
+    if arr.is_empty() { return Ok(init.0); }
+    let mut acc = init.0;
+    for e in &arr {
+        acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
     }
     Ok(acc)
 }
 // accumulate
-#[yaql_function("accumulate", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn accumulate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("accumulate")]
+pub fn accumulate_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     if arr.is_empty() {
         Ok(Primitive::Array(Vec::new()))
     } else {
@@ -595,38 +554,34 @@ pub fn accumulate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>)
         let mut acc = arr[0].clone();
         result.push(acc.clone());
         for e in &arr[1..] {
-            acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+            acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
             result.push(acc.clone());
         }
         Ok(Primitive::Array(result))
     }
 }
-#[yaql_function("accumulate", ArgSpec::Exact(3), [Type::Array, Type::Lambda, Type::Any], false)]
-pub fn accumulate_init_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
-    let init = args.get(2).cloned().unwrap_or(Primitive::Null);
+#[yaql_function("accumulate")]
+pub fn accumulate_init_fn(arr: Vec<Primitive>, lambda: LambdaBody, init: Any) -> Result<Primitive, EvalError> {
     if arr.is_empty() {
-        Ok(Primitive::Array(vec![init]))
+        Ok(Primitive::Array(vec![init.0]))
     } else {
         let mut result = Vec::new();
-        let mut acc = init;
+        let mut acc = init.0;
         result.push(acc.clone());
-        for e in arr {
-            acc = eval_lambda_2arg(lambda, acc, e.clone())?;
+        for e in &arr {
+            acc = eval_lambda_2arg(&lambda, acc, e.clone())?;
             result.push(acc.clone());
         }
         Ok(Primitive::Array(result))
     }
 }
 // toDict: array.toDict(keyFunc, valueFunc) -> Map
-#[yaql_function("toDict", ArgSpec::Min(2), [Type::Array, Type::Any], false)]
-pub fn to_dict_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let key_lambda = get_lambda(&args, 1);
-    let val_lambda = get_lambda(&args, 2);
+#[yaql_function("toDict")]
+pub fn to_dict_fn(arr: Vec<Primitive>, rest: Varargs<1>) -> Result<Primitive, EvalError> {
+    let key_lambda = get_lambda(&rest.0, 0);
+    let val_lambda = get_lambda(&rest.0, 1);
     let mut map = std::collections::HashMap::new();
-    for e in arr {
+    for e in &arr {
         let key = if let Some(kl) = key_lambda { eval_lambda(kl, e.clone())? } else { e.clone() };
         let val = if let Some(vl) = val_lambda { eval_lambda(vl, e.clone())? } else { e.clone() };
         let key_str = match key {
@@ -649,14 +604,12 @@ pub fn eval_lambda_2arg(lambda: &LambdaBody, acc: Primitive, element: Primitive)
 }
 
 // --- splitWhere: split at positions where predicate is true ---
-#[yaql_function("splitWhere", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn split_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("splitWhere")]
+pub fn split_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
     let mut current = Vec::new();
-    for e in arr {
-        if yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?) {
+    for e in &arr {
+        if yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?) {
             result.push(Primitive::Array(current));
             current = Vec::new();
         } else {
@@ -667,15 +620,13 @@ pub fn split_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
     Ok(Primitive::Array(result))
 }
 // --- sliceWhere: group consecutive elements by predicate result ---
-#[yaql_function("sliceWhere", ArgSpec::Exact(2), [Type::Array, Type::Lambda], false)]
-pub fn slice_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(arr) = &args[0] else { return Ok(Primitive::Null) };
-    let Some(Primitive::Lambda(lambda)) = args.get(1) else { return Ok(Primitive::Null) };
+#[yaql_function("sliceWhere")]
+pub fn slice_where_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive, EvalError> {
     let mut result = Vec::new();
     let mut current = Vec::new();
     let mut last_pred: Option<bool> = None;
-    for e in arr {
-        let pred = yaql_core::lang::truthy(&eval_lambda(lambda, e.clone())?);
+    for e in &arr {
+        let pred = yaql_core::lang::truthy(&eval_lambda(&lambda, e.clone())?);
         if last_pred.is_some() && last_pred != Some(pred) {
             result.push(Primitive::Array(current));
             current = Vec::new();
@@ -687,10 +638,9 @@ pub fn slice_where_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>
     Ok(Primitive::Array(result))
 }
 // --- zip ---
-#[yaql_function("zip", ArgSpec::Min(2), [Type::Array], false)]
-pub fn zip_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(first) = &args[0] else { return Ok(Primitive::Null) };
-    let rest: Vec<&Vec<Primitive>> = args[1..].iter().filter_map(|a| if let Primitive::Array(a) = a { Some(a) } else { None }).collect();
+#[yaql_function("zip")]
+pub fn zip_fn(first: Vec<Primitive>, rest: Varargs<1>) -> Result<Primitive, EvalError> {
+    let rest: Vec<&Vec<Primitive>> = rest.0.iter().filter_map(|a| if let Primitive::Array(a) = a { Some(a) } else { None }).collect();
     let min_len = first.len().min(rest.iter().map(|a| a.len()).min().unwrap_or(first.len()));
     let mut result = Vec::new();
     for i in 0..min_len {
@@ -701,14 +651,13 @@ pub fn zip_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Res
     Ok(Primitive::Array(result))
 }
 // --- zipLongest ---
-#[yaql_function("zipLongest", ArgSpec::Min(2), [Type::Array], true)]
-pub fn zip_longest_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(first) = &args[0] else { return Ok(Primitive::Null) };
-    let default = kwargs.iter().find_map(|(k, v)| {
+#[yaql_function("zipLongest")]
+pub fn zip_longest_fn(first: Vec<Primitive>, rest: Varargs<1>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+    let default = kwargs.0.iter().find_map(|(k, v)| {
         if let Primitive::String(key) = k { if key == "default" { return Some(v.clone()); } }
         None
     }).unwrap_or(Primitive::Null);
-    let rest: Vec<&Vec<Primitive>> = args[1..].iter().filter_map(|a| if let Primitive::Array(a) = a { Some(a) } else { None }).collect();
+    let rest: Vec<&Vec<Primitive>> = rest.0.iter().filter_map(|a| if let Primitive::Array(a) = a { Some(a) } else { None }).collect();
     let max_len = first.len().max(rest.iter().map(|a| a.len()).max().unwrap_or(0));
     let mut result = Vec::new();
     for i in 0..max_len {
@@ -758,35 +707,35 @@ fn group_by_impl(args: &[Primitive], kwargs: &[(Primitive, Primitive)]) -> Resul
     Ok(Primitive::Array(result))
 }
 
-#[yaql_function("groupBy", ArgSpec::Exact(2), [Type::Array, Type::Any], false)]
-pub fn group_by_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    group_by_impl(&args, &[])
+#[yaql_function("groupBy")]
+pub fn group_by_fn(arr: Vec<Primitive>, key: Any) -> Result<Primitive, EvalError> {
+    group_by_impl(&[Primitive::Array(arr), key.0], &[])
 }
-#[yaql_function("groupBy", ArgSpec::Exact(3), [Type::Array, Type::Any, Type::Any], false)]
-pub fn group_by_sel_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    group_by_impl(&args, &[])
+#[yaql_function("groupBy")]
+pub fn group_by_sel_fn(arr: Vec<Primitive>, key: Any, sel: Any) -> Result<Primitive, EvalError> {
+    group_by_impl(&[Primitive::Array(arr), key.0, sel.0], &[])
 }
-#[yaql_function("groupBy", ArgSpec::Exact(4), [Type::Array, Type::Any, Type::Any, Type::Any], false)]
-pub fn group_by_agg_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    group_by_impl(&args, &[])
+#[yaql_function("groupBy")]
+pub fn group_by_agg_fn(arr: Vec<Primitive>, key: Any, sel: Any, agg: Any) -> Result<Primitive, EvalError> {
+    group_by_impl(&[Primitive::Array(arr), key.0, sel.0, agg.0], &[])
 }
-#[yaql_function("groupBy", ArgSpec::Min(2), [Type::Array, Type::Any], true)]
-pub fn group_by_kw_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    group_by_impl(&args, &kwargs)
+#[yaql_function("groupBy")]
+pub fn group_by_kw_fn(arr: Vec<Primitive>, rest: Varargs<1>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+    let mut args = vec![Primitive::Array(arr)];
+    args.extend(rest.0);
+    group_by_impl(&args, &kwargs.0)
 }
 // --- join ---
-#[yaql_function("join", ArgSpec::Min(3), [Type::Array, Type::Array, Type::Any], false)]
-pub fn join_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Array(left) = &args[0] else { return Ok(Primitive::Null) };
-    let Primitive::Array(right) = &args[1] else { return Ok(Primitive::Null) };
-    let result_lambda = get_lambda(&args, 3);
+#[yaql_function("join")]
+pub fn join_fn(left: Vec<Primitive>, right: Vec<Primitive>, rest: Varargs<1>) -> Result<Primitive, EvalError> {
+    let result_lambda = get_lambda(&rest.0, 1);
     let mut result = Vec::new();
-    for l in left {
-        for r in right {
-            let matches = if let Some(pred_lambda) = get_lambda(&args, 2) {
+    for l in &left {
+        for r in &right {
+            let matches = if let Some(pred_lambda) = get_lambda(&rest.0, 0) {
                 yaql_core::lang::truthy(&eval_lambda_2arg(pred_lambda, l.clone(), r.clone())?)
             } else {
-                yaql_core::lang::truthy(&args[2])
+                yaql_core::lang::truthy(&rest.0[0])
             };
             if matches {
                 if let Some(rl) = result_lambda {
@@ -800,19 +749,17 @@ pub fn join_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Re
     Ok(Primitive::Array(result))
 }
 // --- mergeWith ---
-#[yaql_function("mergeWith", ArgSpec::Min(2), [Type::Map, Type::Map], true)]
-pub fn merge_with_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let Primitive::Map(left) = &args[0] else { return Ok(Primitive::Null) };
-    let Primitive::Map(right) = &args[1] else { return Ok(Primitive::Null) };
-    let merge_lambda = get_lambda(&args, 2);
-    let max_levels = kwargs.iter().find_map(|(k, v)| {
+#[yaql_function("mergeWith")]
+pub fn merge_with_fn(left: HashMap<String, Primitive>, right: HashMap<String, Primitive>, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+    let merge_lambda = get_lambda(&rest.0, 0);
+    let max_levels = kwargs.0.iter().find_map(|(k, v)| {
         if let Primitive::String(key) = k { if key == "maxLevels" {
             if let Primitive::Int(n) = v { return Some(*n as usize); }
         }}
         None
     }).unwrap_or(usize::MAX);
 
-    fn merge_value(left: &Primitive, right: &Primitive, lambda: Option<&LambdaBody>, levels: usize) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
+    fn merge_value(left: &Primitive, right: &Primitive, lambda: Option<&LambdaBody>, levels: usize) -> Result<Primitive, EvalError> {
         if levels == 0 {
             return Ok(right.clone());
         }
@@ -847,7 +794,7 @@ pub fn merge_with_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) 
     }
 
     let mut result = left.clone();
-    for (k, v) in right {
+    for (k, v) in &right {
         if let Some(existing) = result.get(k) {
             result.insert(k.clone(), merge_value(existing, v, merge_lambda, max_levels.saturating_sub(1))?);
         } else {
@@ -857,14 +804,13 @@ pub fn merge_with_fn(args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) 
     Ok(Primitive::Map(result))
 }
 // --- generate ---
-#[yaql_function("generate", ArgSpec::Min(3), [Type::Any, Type::Any, Type::Any], false)]
-pub fn generate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let init = &args[0];
-    let Some(cond_lambda) = get_lambda(&args, 1) else { return Ok(Primitive::Null) };
-    let Some(next_lambda) = get_lambda(&args, 2) else { return Ok(Primitive::Null) };
-    let proj_lambda = get_lambda(&args, 3);
+#[yaql_function("generate")]
+pub fn generate_fn(init: Any, rest: Varargs<1>) -> Result<Primitive, EvalError> {
+    let Some(cond_lambda) = get_lambda(&rest.0, 0) else { return Ok(Primitive::Null) };
+    let Some(next_lambda) = get_lambda(&rest.0, 1) else { return Ok(Primitive::Null) };
+    let proj_lambda = get_lambda(&rest.0, 2);
     let mut result = Vec::new();
-    let mut current = init.clone();
+    let mut current = init.0;
     let max_iters = 100_000;
     for _ in 0..max_iters {
         if !yaql_core::lang::truthy(&eval_lambda(cond_lambda, current.clone())?) { break; }
@@ -880,16 +826,15 @@ pub fn generate_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -
 // --- repeat ---
 // repeat(value, count) -> array of value repeated count times
 // repeat(value) -> infinite (capped at 10000 for take/limit)
-#[yaql_function("repeat", ArgSpec::Min(1), [Type::Any], false)]
-pub fn repeat_fn(args: Vec<Primitive>, _kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
-    let value = args.get(0).cloned().unwrap_or(Primitive::Null);
-    if args.len() > 1 {
-        if let Primitive::Int(n) = &args[1] {
-            return Ok(Primitive::Array((0..*n).map(|_| value.clone()).collect()));
+#[yaql_function("repeat")]
+pub fn repeat_fn(value: Any, rest: Varargs<0>) -> Result<Primitive, EvalError> {
+    if !rest.0.is_empty() {
+        if let Primitive::Int(n) = &rest.0[0] {
+            return Ok(Primitive::Array((0..*n).map(|_| value.0.clone()).collect()));
         }
     }
     // Infinite repeat — cap at 10000
-    Ok(Primitive::Array((0..10000).map(|_| value.clone()).collect()))
+    Ok(Primitive::Array((0..10000).map(|_| value.0.clone()).collect()))
 }
 // --- cycle ---
 // cycle(array) -> infinite cycling of array elements (capped at 10000)
