@@ -306,30 +306,37 @@ static EMPTY_OVERLOADS: Vec<Spec> = Vec::new();
 
 // --- Dispatch ---
 
+/// Does `spec` accept `args`/`kwargs`? A single candidate match check.
+#[inline]
+fn spec_matches(spec: &Spec, args: &[Primitive], kwargs: &[(Primitive, Primitive)]) -> bool {
+    if !spec.kwargs && !kwargs.is_empty() {
+        return false;
+    }
+    match spec.args {
+        ArgSpec::Exact(n) => if args.len() != n { return false; },
+        ArgSpec::Min(n) => if args.len() < n { return false; },
+        ArgSpec::Varargs => {}
+    }
+    spec.arg_types.iter().enumerate()
+        .all(|(i, ty)| i >= args.len() || ty.matches(&args[i]))
+}
+
 /// Find the best matching overload and call it.
 /// `overloads` is expected to be the pre-sorted list from `FUNCTIONS.lookup`.
+///
+/// Typed overloads are preferred over the untyped catch-alls. This is done with
+/// two allocation-free passes over the already-sorted slice rather than the
+/// previous three `Vec<&Spec>` partition + chain, which reallocated on every call.
 pub fn dispatch(overloads: &[Spec], args: Vec<Primitive>, kwargs: Vec<(Primitive, Primitive)>) -> Result<Primitive, EvalError> {
-    let typed: Vec<&Spec> = overloads.iter().filter(|s| !s.arg_types.is_empty()).collect();
-    let untyped: Vec<&Spec> = overloads.iter().filter(|s| s.arg_types.is_empty()).collect();
-    let ordered: Vec<&Spec> = typed.into_iter().chain(untyped.into_iter()).collect();
-    for spec in &ordered {
-        if !spec.kwargs && !kwargs.is_empty() {
-            continue;
+    for spec in overloads {
+        if !spec.arg_types.is_empty() && spec_matches(spec, &args, &kwargs) {
+            return (spec.func)(args, kwargs);
         }
-        let arg_count_ok = match spec.args {
-            ArgSpec::Exact(n) => args.len() == n,
-            ArgSpec::Min(n) => args.len() >= n,
-            ArgSpec::Varargs => true,
-        };
-        if !arg_count_ok {
-            continue;
+    }
+    for spec in overloads {
+        if spec.arg_types.is_empty() && spec_matches(spec, &args, &kwargs) {
+            return (spec.func)(args, kwargs);
         }
-        let types_ok = spec.arg_types.iter().enumerate()
-            .all(|(i, ty)| i >= args.len() || ty.matches(&args[i]));
-        if !types_ok {
-            continue;
-        }
-        return (spec.func)(args, kwargs);
     }
     if let Some(spec) = overloads.first() {
         if !spec.kwargs { assert_eq!(kwargs.len(), 0); }
