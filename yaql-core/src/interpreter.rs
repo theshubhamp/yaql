@@ -71,6 +71,46 @@ pub fn eval_lambda(lambda: &LambdaBody, arg: Primitive) -> Result<Primitive, Eva
     eval_body(&mut interp, &lambda.body)
 }
 
+/// Reusable lambda evaluator. Seeds a context stack from the lambda's captured
+/// env **once**, then pushes/truncates the per-argument context for each call.
+///
+/// The hot query functions (`where`, `select`, `aggregate`, ...) call a lambda
+/// once per collection element. Naively invoking `eval_lambda` per element
+/// deep-clones the entire captured env (nested maps/strings) on every iteration.
+/// This amortizes that clone over the whole loop.
+pub struct LambdaEval {
+    interp: Interpreter,
+}
+
+impl LambdaEval {
+    pub fn new(lambda: &LambdaBody) -> Self {
+        LambdaEval {
+            interp: Interpreter { contexts: (*lambda.env).clone(), current_func: None },
+        }
+    }
+
+    /// Evaluate `lambda.body` with `arg` pushed as the top context.
+    pub fn call(&mut self, lambda: &LambdaBody, arg: Primitive) -> Result<Primitive, EvalError> {
+        let start = self.interp.contexts.len();
+        self.interp.push_context(arg);
+        let result = eval_body(&mut self.interp, &lambda.body);
+        self.interp.contexts.truncate(start);
+        result
+    }
+
+    /// Evaluate `lambda.body` with a 2-arg lambda context: `arg` on top, and a
+    /// `[acc, element]` array underneath (for `$1`/`$2` positional access).
+    pub fn call_2arg(&mut self, lambda: &LambdaBody, acc: Primitive, element: Primitive) -> Result<Primitive, EvalError> {
+        let start = self.interp.contexts.len();
+        let elem_clone = element.clone();
+        self.interp.push_context(element);
+        self.interp.push_context(Primitive::Array(vec![acc, elem_clone]));
+        let result = eval_body(&mut self.interp, &lambda.body);
+        self.interp.contexts.truncate(start);
+        result
+    }
+}
+
 /// Auto-call a lambda at top level — don't push a new context, just use the env.
 pub fn eval_lambda_auto(lambda: &LambdaBody) -> Result<Primitive, EvalError> {
     let mut interp = Interpreter { contexts: (*lambda.env).clone(), current_func: None };
