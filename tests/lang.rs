@@ -16,7 +16,6 @@ fn interpret_string() {
         _ => panic!("expected String"),
     }
 
-    return;
 }
 
 #[test]
@@ -32,7 +31,6 @@ fn interpret_number() {
         _ => panic!("expected Float"),
     }
 
-    return;
 }
 
 #[test]
@@ -43,7 +41,7 @@ fn interpret_boolean() {
     let result = Interpreter::new(Primitive::Null).visit(&ast).unwrap();
     match result {
         Primitive::Boolean(bool) => {
-            assert_eq!(bool, false);
+            assert!(!bool);
         }
         _ => panic!("expected Boolean"),
     }
@@ -54,12 +52,11 @@ fn interpret_boolean() {
     let result = Interpreter::new(Primitive::Null).visit(&ast).unwrap();
     match result {
         Primitive::Boolean(bool) => {
-            assert_eq!(bool, true);
+            assert!(bool);
         }
         _ => panic!("expected Boolean"),
     }
 
-    return;
 }
 
 #[test]
@@ -73,7 +70,6 @@ fn interpret_null() {
         _ => panic!("expected Null"),
     }
 
-    return;
 }
 
 #[test]
@@ -87,5 +83,4 @@ fn interpret_dollar() {
         _ => panic!("expected Null"),
     }
 
-    return;
 }

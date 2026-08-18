@@ -40,13 +40,13 @@ pub enum Primitive {
 
 pub fn truthy(value: &Primitive) -> bool {
     match value {
-        Primitive::String(s) => s.len() > 0,
+        Primitive::String(s) => !s.is_empty(),
         Primitive::Int(n) => *n != 0,
         Primitive::Float(n) => *n != 0.0,
         Primitive::Boolean(b) => *b,
-        Primitive::Array(v) => v.len() > 0,
-        Primitive::Set(v) => v.len() > 0,
-        Primitive::Map(m) => m.len() > 0,
+        Primitive::Array(v) => !v.is_empty(),
+        Primitive::Set(v) => !v.is_empty(),
+        Primitive::Map(m) => !m.is_empty(),
         Primitive::Regex(_) => true,
         Primitive::Lambda(_) => true,
         Primitive::Null => false,
@@ -109,7 +109,7 @@ pub fn primitive_eq(a: &Primitive, b: &Primitive) -> bool {
         (Primitive::Null, Primitive::Null) => true,
         (Primitive::Array(l), Primitive::Array(r)) => l.len() == r.len() && l.iter().zip(r).all(|(a, b)| primitive_eq(a, b)),
         (Primitive::Set(l), Primitive::Set(r)) => crate::lang::sets::set_equal(l, r),
-        (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| primitive_eq(v, rv))),
+        (Primitive::Map(l), Primitive::Map(r)) => l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).is_some_and(|rv| primitive_eq(v, rv))),
         _ => false,
     }
 }

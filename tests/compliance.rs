@@ -382,7 +382,7 @@ compliance_cases! {
     case_str_verbatim_backslash: "`\\\\`", Value::Null;
     case_str_len_abc: "len(abc)", Value::Null;
     case_str_to_upper_qq: "qq.toUpper()", Value::Null;
-    case_str_to_lower_QQ: "QQ.toLower()", Value::Null;
+    case_str_to_lower_qq: "QQ.toLower()", Value::Null;
     case_str_eq_a_a: "a = a", Value::Null;
     case_str_eq_a_b_false: "a = b", Value::Null;
     case_str_neq_a_a_false: "a != a", Value::Null;
@@ -396,8 +396,8 @@ compliance_cases! {
     case_str_is_empty_method: "null.isEmpty()", Value::Null;
     case_str_is_empty_spaces: "isEmpty('  ')", Value::Null;
     case_str_is_empty_x_false: "isEmpty('  x')", Value::Null;
-    case_str_in_B_ABC: "B in ABC", Value::Null;
-    case_str_in_D_ABC_false: "D in ABC", Value::Null;
+    case_str_in_b_abc: "B in ABC", Value::Null;
+    case_str_in_d_abc_false: "D in ABC", Value::Null;
     case_str_str_null: "str(null)", Value::Null;
     case_str_str_true: "str(true)", Value::Null;
     case_str_str_false: "str(false)", Value::Null;
@@ -409,10 +409,10 @@ compliance_cases! {
     case_str_max_a_z: "max(a, z)", Value::Null;
     case_str_min_a_z: "min(a, z)", Value::Null;
     case_str_to_char_array: "abc.toCharArray()", Value::Null;
-    case_str_starts_with_A: "ABC.startsWith(A)", Value::Null;
-    case_str_starts_with_C_false: "ABC.startsWith(C)", Value::Null;
-    case_str_ends_with_C: "ABC.endsWith(C)", Value::Null;
-    case_str_ends_with_B_false: "ABC.endsWith(B)", Value::Null;
+    case_str_starts_with_a: "ABC.startsWith(A)", Value::Null;
+    case_str_starts_with_c_false: "ABC.startsWith(C)", Value::Null;
+    case_str_ends_with_c: "ABC.endsWith(C)", Value::Null;
+    case_str_ends_with_b_false: "ABC.endsWith(B)", Value::Null;
     case_str_hex_255: "hex(255)", Value::Null;
     case_str_hex_neg42: "hex(-42)", Value::Null;
 
@@ -436,7 +436,7 @@ compliance_cases! {
     case_coll_index_list_neg1_1: "$[-1-1]", json!([1, 2, 3]);
     case_coll_index_dict_a: "$[a]", json!({"a": 12, "b c": 44});
     case_coll_index_dict_bc: "$['b c']", json!({"a": 12, "b c": 44});
-    case_coll_kw_dict_A: "$.A", json!({"A": 12, "b c": 44, "__d": 99, "_e": 999});
+    case_coll_kw_dict_a: "$.A", json!({"A": 12, "b c": 44, "__d": 99, "_e": 999});
     case_coll_kw_dict_e: "$._e", json!({"A": 12, "b c": 44, "__d": 99, "_e": 999});
     case_coll_dict_get_a: "$.get(a)", json!({"a": 12, "b c": 44});
     case_coll_dict_get_b_null: "$.get(b)", json!({"a": 12, "b c": 44});
@@ -812,10 +812,10 @@ compliance_cases! {
     // ========================================================================= //
     // thenBy/thenByDescending (compound sort with stored sort keys)
     // ========================================================================= //
-    case_order_by_thenBy: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_order_desc_thenBy: "$.orderByDescending($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_order_by_thenByDesc: "$.orderBy($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
-    case_order_desc_thenByDesc: "$.orderByDescending($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_by_then_by: "$.orderBy($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_desc_then_by: "$.orderByDescending($[0]).thenBy($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_by_then_by_desc: "$.orderBy($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
+    case_order_desc_then_by_desc: "$.orderByDescending($[0]).thenByDescending($[1])", json!([[2, 2], [1, 5], [1, 0]]);
 
     // ========================================================================= //
     // repeat, cycle (infinite iterators capped at 10000)

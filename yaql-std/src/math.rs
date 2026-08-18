@@ -33,7 +33,7 @@ fn round_1(n: Number) -> f64 {
     let n = n.0;
     let i = n as i64;
     let diff = n - i as f64;
-    if diff > 0.5 || diff < -0.5 { n.round() }
+    if !(-0.5..=0.5).contains(&diff) { n.round() }
     else if diff == 0.5 || diff == -0.5 { if i % 2 == 0 { i as f64 } else { (i + 1) as f64 } }
     else { i as f64 }
 }
@@ -45,7 +45,7 @@ fn round_2(n: Number, decimals: i64) -> f64 {
     let scaled = n * factor;
     let i = scaled as i64;
     let diff = scaled - i as f64;
-    let rounded = if diff > 0.5 || diff < -0.5 { scaled.round() }
+    let rounded = if !(-0.5..=0.5).contains(&diff) { scaled.round() }
         else if diff == 0.5 || diff == -0.5 { if i % 2 == 0 { i as f64 } else { (i + 1) as f64 } }
         else { i as f64 };
     rounded / factor

@@ -109,7 +109,7 @@ fn parse_function_call() {
     let ast = parse_result.unwrap();
     assert!(matches!(ast, Value::FunctionCall(_, _, _)));
     match ast {
-        Value::FunctionCall(ident, args, kwargs) => {
+        Value::FunctionCall(ident, args, _kwargs) => {
             assert_eq!(ident, "abc");
             assert!(matches!(args.len(), 1));
         },

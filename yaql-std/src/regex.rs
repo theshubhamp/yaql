@@ -13,7 +13,7 @@ fn build_regex(pattern: &str, ignore_case: bool) -> Option<RegexWrapper> {
 }
 
 #[yaql_function("regex")]
-pub fn regex_fn(pattern: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
+pub fn regex_fn(pattern: String, _rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
     let ignore_case = kwargs.0.iter().find_map(|(k, v)| {
         if let Primitive::String(key) = k {
             if key == "ignoreCase" {
@@ -150,8 +150,7 @@ pub fn regex_replace_by_lambda_fn(re: RegexWrapper, s: String, lambda: LambdaBod
     } else { None };
     let mut result = String::new();
     let mut last_end = 0;
-    let mut matched = 0;
-    for cap in re.0.captures_iter(&s) {
+    for (matched, cap) in re.0.captures_iter(&s).enumerate() {
         if let Some(c) = count { if matched >= c { break; } }
         let m = cap.get(0).unwrap();
         result.push_str(&s[last_end..m.start()]);
@@ -165,7 +164,6 @@ pub fn regex_replace_by_lambda_fn(re: RegexWrapper, s: String, lambda: LambdaBod
         let replacement = yaql_core::interpreter::eval_body(&mut interp, &lambda.body)?;
         if let Primitive::String(r) = replacement { result.push_str(&r); }
         last_end = m.end();
-        matched += 1;
     }
     result.push_str(&s[last_end..]);
     Ok(Primitive::String(result))
@@ -177,8 +175,7 @@ pub fn str_replace_by_lambda_fn(s: String, re: RegexWrapper, lambda: LambdaBody,
     } else { None };
     let mut result = String::new();
     let mut last_end = 0;
-    let mut matched = 0;
-    for cap in re.0.captures_iter(&s) {
+    for (matched, cap) in re.0.captures_iter(&s).enumerate() {
         if let Some(c) = count { if matched >= c { break; } }
         let m = cap.get(0).unwrap();
         result.push_str(&s[last_end..m.start()]);
@@ -192,24 +189,16 @@ pub fn str_replace_by_lambda_fn(s: String, re: RegexWrapper, lambda: LambdaBody,
         let replacement = yaql_core::interpreter::eval_body(&mut interp, &lambda.body)?;
         if let Primitive::String(r) = replacement { result.push_str(&r); }
         last_end = m.end();
-        matched += 1;
     }
     result.push_str(&s[last_end..]);
     Ok(Primitive::String(result))
 }
-fn match_to_map(m: &regex::Match, s: &str) -> Primitive {
+fn match_to_map(m: &regex::Match, _s: &str) -> Primitive {
     let mut map = std::collections::HashMap::new();
     map.insert("value".to_string(), Primitive::String(m.as_str().to_string()));
     map.insert("start".to_string(), Primitive::Int(m.start() as i64));
     map.insert("end".to_string(), Primitive::Int(m.end() as i64));
     Primitive::Map(map)
-}
-
-fn capture_to_map(cap: &regex::Captures, idx: usize, s: &str) -> Primitive {
-    match cap.get(idx) {
-        Some(m) => match_to_map(&m, s),
-        None => Primitive::Null,
-    }
 }
 
 fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&regex::Captures>, s: &str) -> Result<Primitive, yaql_core::lang::functions::EvalError> {
@@ -235,9 +224,9 @@ fn apply_selector(selector: &Primitive, m: &regex::Match, captures: Option<&rege
 fn apply_backrefs(re: &Regex, s: &str, replacement: &str, count: Option<usize>) -> String {
     // Handle backreferences: \1, \2, ... and ${name}
     let captures_iter: Vec<regex::Captures> = if let Some(n) = count {
-        re.captures_iter(&s).take(n).collect()
+        re.captures_iter(s).take(n).collect()
     } else {
-        re.captures_iter(&s).collect()
+        re.captures_iter(s).collect()
     };
 
     if captures_iter.is_empty() {
@@ -287,14 +276,12 @@ fn expand_backrefs(cap: &regex::Captures, replacement: &str) -> String {
 fn split_with_max(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut last_end = 0;
-    let mut splits = 0;
-    for m in re.find_iter(&s) {
+    for (splits, m) in re.find_iter(s).enumerate() {
         if splits >= maxsplit {
             break;
         }
         result.push(Primitive::String(s[last_end..m.start()].to_string()));
         last_end = m.end();
-        splits += 1;
     }
     result.push(Primitive::String(s[last_end..].to_string()));
     result
@@ -303,7 +290,7 @@ fn split_with_max(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
 pub(crate) fn split_captures(re: &Regex, s: &str) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut last_end = 0;
-    for cap in re.captures_iter(&s) {
+    for cap in re.captures_iter(s) {
         let m = cap.get(0).unwrap();
         result.push(Primitive::String(s[last_end..m.start()].to_string()));
         // Insert capture groups (1..n)
@@ -323,8 +310,7 @@ pub(crate) fn split_captures(re: &Regex, s: &str) -> Vec<Primitive> {
 fn split_with_max_captures(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitive> {
     let mut result = Vec::new();
     let mut last_end = 0;
-    let mut splits = 0;
-    for cap in re.captures_iter(&s) {
+    for (splits, cap) in re.captures_iter(s).enumerate() {
         if splits >= maxsplit {
             break;
         }
@@ -338,7 +324,6 @@ fn split_with_max_captures(re: &Regex, s: &str, maxsplit: usize) -> Vec<Primitiv
             }
         }
         last_end = m.end();
-        splits += 1;
     }
     result.push(Primitive::String(s[last_end..].to_string()));
     result

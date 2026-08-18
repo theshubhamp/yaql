@@ -83,8 +83,7 @@ fn right_split_2(s: String, sep: String) -> Vec<Primitive> {
     if sep.is_empty() {
         s.chars().map(|c| Primitive::String(c.to_string())).collect()
     } else {
-        let parts: Vec<&str> = s.rsplitn(1, sep.as_str()).collect();
-        parts.into_iter().rev().map(|p| Primitive::String(p.to_string())).collect()
+        s.split(sep.as_str()).map(|p| Primitive::String(p.to_string())).collect()
     }
 }
 
@@ -170,7 +169,7 @@ pub fn replace_dict(s: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primi
         if let Primitive::Int(c) = &rest.0[1] { Some(*c) } else { None }
     } else { None };
 
-    let dict = if let Some(Primitive::Map(m)) = rest.0.get(0) {
+    let dict = if let Some(Primitive::Map(m)) = rest.0.first() {
         Some(m.clone())
     } else if kwargs.0.iter().any(|(k, _)| matches!(k, Primitive::String(_))) {
         let mut map = std::collections::HashMap::new();

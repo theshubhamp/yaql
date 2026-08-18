@@ -405,8 +405,7 @@ fn is_strict_lambda(func: &Option<String>) -> bool {
 
 /// Functions that treat their arguments as implicit lambdas when they contain `$`.
 fn is_lambda_context(func: &Option<String>) -> bool {
-    match func.as_deref() {
-        Some("where") | Some("select") | Some("selectMany")
+    matches!(func.as_deref(), Some("where") | Some("select") | Some("selectMany")
         | Some("orderBy") | Some("orderByDescending")
         | Some("thenBy") | Some("thenByDescending")
         | Some("takeWhile") | Some("skipWhile")
@@ -417,8 +416,5 @@ fn is_lambda_context(func: &Option<String>) -> bool {
         | Some("splitWhere") | Some("sliceWhere")
         | Some("join") | Some("mergeWith")
         | Some("search") | Some("searchAll") | Some("replaceBy")
-        | Some("generate") | Some("generateMany")
-        => true,
-        _ => false,
-    }
+        | Some("generate") | Some("generateMany"))
 }

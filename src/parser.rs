@@ -7,6 +7,8 @@ pub struct ParseError {
     pub msg: String,
 }
 
+type ArgList = (Vec<Value>, Vec<(Value, Value)>);
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.msg)
@@ -109,15 +111,10 @@ impl<'input> Parser<'input> {
 
     fn parse_and(&mut self) -> Result<Value, ParseError> {
         let mut left = self.parse_comparison()?;
-        loop {
-            match self.peek_tok()? {
-                Some(Tok::And) => {
-                    self.advance()?;
-                    let right = self.parse_comparison()?;
-                    left = Value::BinaryOperator(Box::new(left), "and".to_string(), Box::new(right));
-                }
-                _ => break,
-            }
+        while let Some(Tok::And) = self.peek_tok()? {
+            self.advance()?;
+            let right = self.parse_comparison()?;
+            left = Value::BinaryOperator(Box::new(left), "and".to_string(), Box::new(right));
         }
         Ok(left)
     }
@@ -328,29 +325,24 @@ impl<'input> Parser<'input> {
             }
             _ => { items.push(first); }
         }
-        loop {
+        while let Some(Tok::Comma) = self.peek_tok()? {
+            self.advance()?;
+            if self.is_closing()? { break; }
+            let key_or_arg = self.parse_value()?;
             match self.peek_tok()? {
-                Some(Tok::Comma) => {
+                Some(Tok::MappingArrow) => {
                     self.advance()?;
-                    if self.is_closing()? { break; }
-                    let key_or_arg = self.parse_value()?;
-                    match self.peek_tok()? {
-                        Some(Tok::MappingArrow) => {
-                            self.advance()?;
-                            let val = self.parse_value()?;
-                            items.push(Value::BinaryOperator(Box::new(key_or_arg), "=>".to_string(), Box::new(val)));
-                        }
-                        _ => { items.push(key_or_arg); }
-                    }
+                    let val = self.parse_value()?;
+                    items.push(Value::BinaryOperator(Box::new(key_or_arg), "=>".to_string(), Box::new(val)));
                 }
-                _ => break,
+                _ => { items.push(key_or_arg); }
             }
         }
         Ok(items)
     }
 
     /// Parse function argument list: positional args then kwargs.
-    fn parse_arg_list(&mut self) -> Result<(Vec<Value>, Vec<(Value, Value)>), ParseError> {
+    fn parse_arg_list(&mut self) -> Result<ArgList, ParseError> {
         let mut args = Vec::new();
         let mut kwargs = Vec::new();
         if self.is_closing()? { return Ok((args, kwargs)); }
@@ -370,27 +362,22 @@ impl<'input> Parser<'input> {
             }
         }
 
-        loop {
+        while let Some(Tok::Comma) = self.peek_tok()? {
+            self.advance()?;
+            if self.is_closing()? { break; }
+            // Handle empty arg (,,)
+            if let Some(Tok::Comma) = self.peek_tok()? {
+                args.push(Value::NullLiteral);
+                continue;
+            }
+            let key_or_arg = self.parse_value()?;
             match self.peek_tok()? {
-                Some(Tok::Comma) => {
+                Some(Tok::MappingArrow) => {
                     self.advance()?;
-                    if self.is_closing()? { break; }
-                    // Handle empty arg (,,)
-                    if let Some(Tok::Comma) = self.peek_tok()? {
-                        args.push(Value::NullLiteral);
-                        continue;
-                    }
-                    let key_or_arg = self.parse_value()?;
-                    match self.peek_tok()? {
-                        Some(Tok::MappingArrow) => {
-                            self.advance()?;
-                            let val = self.parse_value()?;
-                            kwargs.push((key_or_arg, val));
-                        }
-                        _ => { args.push(key_or_arg); }
-                    }
+                    let val = self.parse_value()?;
+                    kwargs.push((key_or_arg, val));
                 }
-                _ => break,
+                _ => { args.push(key_or_arg); }
             }
         }
         Ok((args, kwargs))
@@ -401,15 +388,10 @@ impl<'input> Parser<'input> {
         let mut entries = Vec::new();
         if self.is_closing()? { return Ok(entries); }
         entries.push(self.parse_mapping()?);
-        loop {
-            match self.peek_tok()? {
-                Some(Tok::Comma) => {
-                    self.advance()?;
-                    if self.is_closing()? { break; }
-                    entries.push(self.parse_mapping()?);
-                }
-                _ => break,
-            }
+        while let Some(Tok::Comma) = self.peek_tok()? {
+            self.advance()?;
+            if self.is_closing()? { break; }
+            entries.push(self.parse_mapping()?);
         }
         Ok(entries)
     }

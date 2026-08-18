@@ -38,21 +38,17 @@ pub enum Type {
 
 impl Type {
     pub fn matches(&self, val: &Primitive) -> bool {
-        match (self, val) {
-            (Type::Int, Primitive::Int(_)) => true,
-            (Type::Float, Primitive::Float(_)) => true,
-            (Type::Number, Primitive::Int(_) | Primitive::Float(_)) => true,
-            (Type::String, Primitive::String(_)) => true,
-            (Type::Boolean, Primitive::Boolean(_)) => true,
-            (Type::Array, Primitive::Array(_)) => true,
-            (Type::Set, Primitive::Set(_)) => true,
-            (Type::Map, Primitive::Map(_)) => true,
-            (Type::Regex, Primitive::Regex(_)) => true,
-            (Type::Lambda, Primitive::Lambda(_)) => true,
-            (Type::Null, Primitive::Null) => true,
-            (Type::Any, _) => true,
-            _ => false,
-        }
+        matches!((self, val), (Type::Int, Primitive::Int(_)) | (Type::Float, Primitive::Float(_))
+            | (Type::Number, Primitive::Int(_) | Primitive::Float(_))
+            | (Type::String, Primitive::String(_))
+            | (Type::Boolean, Primitive::Boolean(_))
+            | (Type::Array, Primitive::Array(_))
+            | (Type::Set, Primitive::Set(_))
+            | (Type::Map, Primitive::Map(_))
+            | (Type::Regex, Primitive::Regex(_))
+            | (Type::Lambda, Primitive::Lambda(_))
+            | (Type::Null, Primitive::Null)
+            | (Type::Any, _))
     }
 }
 

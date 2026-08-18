@@ -27,12 +27,12 @@ fn varargs_min(t: &syn::Type) -> Option<usize> {
             return None;
         }
         if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-            if let Some(syn::GenericArgument::Const(expr)) = args.args.first() {
-                if let syn::Expr::Lit(lit) = expr {
-                    if let syn::Lit::Int(n) = &lit.lit {
-                        return n.base10_parse::<usize>().ok();
-                    }
-                }
+            if let Some(syn::GenericArgument::Const(syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(n),
+                ..
+            }))) = args.args.first()
+            {
+                return n.base10_parse::<usize>().ok();
             }
         }
     }

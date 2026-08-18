@@ -144,12 +144,10 @@ impl<'input> Iterator for Lexer<'input> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let start = self.pos;
-            let ch = match self.chars.next() {
-                Some(c) => {
-                    self.pos += c.len_utf8();
-                    c
-                }
-                None => return None,
+            let ch = {
+                let c = self.chars.next()?;
+                self.pos += c.len_utf8();
+                c
             };
 
             if ch.is_whitespace() {

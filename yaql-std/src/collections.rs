@@ -43,7 +43,7 @@ fn contains_key_str(m: HashMap<String, Primitive>, key: String) -> bool {
 }
 
 #[yaql_function("containsKey")]
-fn contains_key_any(m: HashMap<String, Primitive>, _key: Any) -> bool {
+fn contains_key_any(_m: HashMap<String, Primitive>, _key: Any) -> bool {
     false
 }
 

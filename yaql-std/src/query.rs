@@ -10,8 +10,8 @@ use std::collections::HashMap;
 // Each element's sort key is a Vec<Primitive> (multiple sort keys compound)
 // SORT_DESC tracks whether each key position was sorted descending
 thread_local! {
-    static SORT_KEYS: RefCell<Vec<Vec<Primitive>>> = RefCell::new(Vec::new());
-    static SORT_DESC: RefCell<Vec<bool>> = RefCell::new(Vec::new());
+    static SORT_KEYS: RefCell<Vec<Vec<Primitive>>> = const { RefCell::new(Vec::new()) };
+    static SORT_DESC: RefCell<Vec<bool>> = const { RefCell::new(Vec::new()) };
 }
 
 pub fn store_sort_keys(keys: Vec<Vec<Primitive>>, desc: Vec<bool>) {
@@ -291,7 +291,7 @@ pub fn order_by_fn(arr: Vec<Primitive>, lambda: LambdaBody) -> Result<Primitive,
 #[yaql_function("orderBy")]
 fn order_by_identity(arr: Vec<Primitive>, _any: Any) -> Vec<Primitive> {
     let mut sorted = arr;
-    sorted.sort_by(|a, b| yaql_core::lang::compare(a, b));
+    sorted.sort_by(yaql_core::lang::compare);
     let keys: Vec<Vec<Primitive>> = sorted.iter().map(|e| vec![e.clone()]).collect();
     crate::query::store_sort_keys(keys, vec![false]);
     sorted
@@ -806,7 +806,7 @@ pub fn generate_fn(init: Any, rest: Varargs<1>) -> Result<Primitive, EvalError> 
     let max_iters = 100_000;
     let mut cev = LambdaEval::new(cond_lambda);
     let mut nev = LambdaEval::new(next_lambda);
-    let mut pev = proj_lambda.map(|p| LambdaEval::new(p));
+    let mut pev = proj_lambda.map(LambdaEval::new);
     for _ in 0..max_iters {
         if !yaql_core::lang::truthy(&cev.call(cond_lambda, current.clone())?) { break; }
         if let Some(pl) = proj_lambda {

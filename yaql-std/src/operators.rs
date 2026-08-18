@@ -130,7 +130,7 @@ fn eq_num_bool(l: Number, r: bool) -> bool { (l.0 == 1.0) == r }
 fn eq_bool_num(l: bool, r: Number) -> bool { l == (r.0 == 1.0) }
 
 #[yaql_function("=")]
-fn eq_null(l: Null, r: Null) -> bool { true }
+fn eq_null(_l: Null, _r: Null) -> bool { true }
 
 #[yaql_function("=")]
 fn eq_arr(l: Vec<Primitive>, r: Vec<Primitive>) -> bool {
@@ -144,11 +144,11 @@ fn eq_set(l: SetVec, r: SetVec) -> bool {
 
 #[yaql_function("=")]
 fn eq_map(l: HashMap<String, Primitive>, r: HashMap<String, Primitive>) -> bool {
-    l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).map_or(false, |rv| yaql_core::lang::primitive_eq(v, rv)))
+    l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).is_some_and(|rv| yaql_core::lang::primitive_eq(v, rv)))
 }
 
 #[yaql_function("=")]
-fn eq_any(l: Any, r: Any) -> bool { false }
+fn eq_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function("!=")]
 fn neq(l: Any, r: Any) -> bool { !yaql_core::lang::primitive_eq(&l.0, &r.0) }
@@ -159,19 +159,19 @@ fn lt_set(l: SetVec, r: SetVec) -> bool {
 }
 
 #[yaql_function("<")]
-fn lt_null_null(l: Null, r: Null) -> bool { false }
+fn lt_null_null(_l: Null, _r: Null) -> bool { false }
 
 #[yaql_function("<")]
-fn lt_null_any(l: Null, r: Any) -> bool { true }
+fn lt_null_any(_l: Null, _r: Any) -> bool { true }
 
 #[yaql_function("<")]
-fn lt_any_null(l: Any, r: Null) -> bool { false }
+fn lt_any_null(_l: Any, _r: Null) -> bool { false }
 
 #[yaql_function("<")]
 fn lt_num(l: Number, r: Number) -> bool { l.0 < r.0 }
 
 #[yaql_function("<")]
-fn lt_any(l: Any, r: Any) -> bool { false }
+fn lt_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function("<=")]
 fn lteq_set(l: SetVec, r: SetVec) -> bool {
@@ -179,19 +179,19 @@ fn lteq_set(l: SetVec, r: SetVec) -> bool {
 }
 
 #[yaql_function("<=")]
-fn lteq_null_null(l: Null, r: Null) -> bool { true }
+fn lteq_null_null(_l: Null, _r: Null) -> bool { true }
 
 #[yaql_function("<=")]
-fn lteq_null_any(l: Null, r: Any) -> bool { true }
+fn lteq_null_any(_l: Null, _r: Any) -> bool { true }
 
 #[yaql_function("<=")]
-fn lteq_any_null(l: Any, r: Null) -> bool { false }
+fn lteq_any_null(_l: Any, _r: Null) -> bool { false }
 
 #[yaql_function("<=")]
 fn lteq_num(l: Number, r: Number) -> bool { l.0 <= r.0 }
 
 #[yaql_function("<=")]
-fn lteq_any(l: Any, r: Any) -> bool { false }
+fn lteq_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function(">")]
 fn gt_set(l: SetVec, r: SetVec) -> bool {
@@ -199,19 +199,19 @@ fn gt_set(l: SetVec, r: SetVec) -> bool {
 }
 
 #[yaql_function(">")]
-fn gt_null_null(l: Null, r: Null) -> bool { false }
+fn gt_null_null(_l: Null, _r: Null) -> bool { false }
 
 #[yaql_function(">")]
-fn gt_null_any(l: Null, r: Any) -> bool { false }
+fn gt_null_any(_l: Null, _r: Any) -> bool { false }
 
 #[yaql_function(">")]
-fn gt_any_null(l: Any, r: Null) -> bool { true }
+fn gt_any_null(_l: Any, _r: Null) -> bool { true }
 
 #[yaql_function(">")]
 fn gt_num(l: Number, r: Number) -> bool { l.0 > r.0 }
 
 #[yaql_function(">")]
-fn gt_any(l: Any, r: Any) -> bool { false }
+fn gt_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function(">=")]
 fn gteq_set(l: SetVec, r: SetVec) -> bool {
@@ -219,19 +219,19 @@ fn gteq_set(l: SetVec, r: SetVec) -> bool {
 }
 
 #[yaql_function(">=")]
-fn gteq_null_null(l: Null, r: Null) -> bool { true }
+fn gteq_null_null(_l: Null, _r: Null) -> bool { true }
 
 #[yaql_function(">=")]
-fn gteq_null_any(l: Null, r: Any) -> bool { false }
+fn gteq_null_any(_l: Null, _r: Any) -> bool { false }
 
 #[yaql_function(">=")]
-fn gteq_any_null(l: Any, r: Null) -> bool { true }
+fn gteq_any_null(_l: Any, _r: Null) -> bool { true }
 
 #[yaql_function(">=")]
 fn gteq_num(l: Number, r: Number) -> bool { l.0 >= r.0 }
 
 #[yaql_function(">=")]
-fn gteq_any(l: Any, r: Any) -> bool { false }
+fn gteq_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function("in")]
 fn in_str(l: String, r: String) -> bool { r.contains(l.as_str()) }
@@ -247,7 +247,7 @@ fn in_set(l: Any, r: SetVec) -> bool {
 }
 
 #[yaql_function("in")]
-fn in_any(l: Any, r: Any) -> bool { false }
+fn in_any(_l: Any, _r: Any) -> bool { false }
 
 #[yaql_function(".")]
 fn dot_map(l: HashMap<String, Primitive>, r: String) -> Primitive {
@@ -260,7 +260,7 @@ fn dot_arr(l: Vec<Primitive>, r: String) -> Primitive {
 }
 
 #[yaql_function(".")]
-fn dot_any(l: Any, r: Any) -> Primitive { Primitive::Null }
+fn dot_any(_l: Any, _r: Any) -> Primitive { Primitive::Null }
 
 #[yaql_function("?.")]
 fn dot_map_opt(l: HashMap<String, Primitive>, r: String) -> Primitive {
@@ -273,10 +273,10 @@ fn dot_arr_opt(l: Vec<Primitive>, r: String) -> Primitive {
 }
 
 #[yaql_function("?.")]
-fn dot_any_opt(l: Any, r: Any) -> Primitive { Primitive::Null }
+fn dot_any_opt(_l: Any, _r: Any) -> Primitive { Primitive::Null }
 
 #[yaql_function("=>")]
-fn mapping_arrow(l: Any, r: Any) -> Primitive { Primitive::Null }
+fn mapping_arrow(_l: Any, _r: Any) -> Primitive { Primitive::Null }
 
 #[yaql_function("=~")]
 fn match_regex(s: String, re: RegexWrapper) -> bool {
@@ -291,7 +291,7 @@ fn match_pattern(s: String, p: String) -> bool {
 }
 
 #[yaql_function("=~")]
-fn match_any(l: Any, r: Any) -> Primitive { Primitive::Null }
+fn match_any(_l: Any, _r: Any) -> Primitive { Primitive::Null }
 
 #[yaql_function("!~")]
 fn nmatch_regex(s: String, re: RegexWrapper) -> bool {
@@ -306,4 +306,4 @@ fn nmatch_pattern(s: String, p: String) -> bool {
 }
 
 #[yaql_function("!~")]
-fn nmatch_any(l: Any, r: Any) -> Primitive { Primitive::Null }
+fn nmatch_any(_l: Any, _r: Any) -> Primitive { Primitive::Null }

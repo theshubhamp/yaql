@@ -10,28 +10,28 @@ fn interpret_and() {
     let parse_result = Parser::parse("true and true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true and false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false and false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false and true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
@@ -57,28 +57,28 @@ fn interpret_or() {
     let parse_result = Parser::parse("true or true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true or false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false or false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false or true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
@@ -104,56 +104,56 @@ fn interpret_eq() {
     let parse_result = Parser::parse("false = false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false != true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true != false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true = true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, true),
+        Primitive::Boolean(bool) => assert!(bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true = false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false = true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("false != false");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 
     let parse_result = Parser::parse("true != true");
     let ast = parse_result.unwrap();
     match interpreter.visit(&ast).unwrap() {
-        Primitive::Boolean(bool) => assert_eq!(bool, false),
+        Primitive::Boolean(bool) => assert!(!bool),
         _ => panic!("expected Boolean"),
     }
 }
