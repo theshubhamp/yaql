@@ -12,7 +12,6 @@ fn build_regex(pattern: &str, ignore_case: bool) -> Option<RegexWrapper> {
     builder.build().ok().map(|re| RegexWrapper::new(re, ignore_case))
 }
 
-// regex(pattern) and regex(pattern, ignoreCase => bool)
 #[yaql_function("regex")]
 pub fn regex_fn(pattern: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
     let ignore_case = kwargs.0.iter().find_map(|(k, v)| {
@@ -28,26 +27,21 @@ pub fn regex_fn(pattern: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Pri
         None => Ok(Primitive::Null),
     }
 }
-// escapeRegex(s)
 #[yaql_function("escapeRegex")]
 fn escape_regex(s: String) -> String {
     regex::escape(&s)
 }
 
-// isRegex(x)
 #[yaql_function("isRegex")]
 fn is_regex(v: Any) -> bool {
     matches!(v.0, Primitive::Regex(_))
 }
 
-// --- matches ---
-// regex.matches(string) -> bool (partial match / search)
 #[yaql_function("matches")]
 fn regex_matches(re: RegexWrapper, s: String) -> bool {
     re.0.is_match(&s)
 }
 
-// string.matches(string) -> bool (full match via anchoring)
 #[yaql_function("matches")]
 fn str_matches(s: String, pattern: String) -> Option<bool> {
     let anchored = format!("^(?:{})$", pattern);
@@ -57,9 +51,6 @@ fn str_matches(s: String, pattern: String) -> Option<bool> {
     }
 }
 
-// --- search ---
-// regex.search(string) -> string | null  (first full match value)
-// regex.search(string, selector) -> selector applied to match object
 #[yaql_function("search")]
 pub fn regex_search_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let m = match re.0.find(&s) {
@@ -74,9 +65,6 @@ pub fn regex_search_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Result<
     let selector = &rest.0[0];
     apply_selector(selector, &m, captures.as_ref(), &s)
 }
-// --- searchAll ---
-// regex.searchAll(string) -> array of strings
-// regex.searchAll(string, selector) -> array of selector results
 #[yaql_function("searchAll")]
 pub fn regex_search_all_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let has_selector = !rest.0.is_empty();
@@ -92,9 +80,6 @@ pub fn regex_search_all_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Res
     }
     Ok(Primitive::Array(results))
 }
-// --- split ---
-// regex.split(string) -> array
-// regex.split(string, maxsplit) -> array
 #[yaql_function("split")]
 pub fn regex_split_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let maxsplit = if !rest.0.is_empty() {
@@ -117,7 +102,6 @@ pub fn regex_split_fn(re: RegexWrapper, s: String, rest: Varargs<0>) -> Result<P
     }
     Ok(Primitive::Array(parts))
 }
-// string.split(regex) -> array
 #[yaql_function("split")]
 fn str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<Primitive> {
     if re.0.captures_len() > 1 {
@@ -127,9 +111,6 @@ fn str_split_regex_fn(s: String, re: RegexWrapper) -> Vec<Primitive> {
     }
 }
 
-// --- replace ---
-// regex.replace(string, replacement) -> string
-// regex.replace(string, replacement, count) -> string
 #[yaql_function("replace")]
 pub fn regex_replace_fn(re: RegexWrapper, s: String, replacement: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let count = if !rest.0.is_empty() {
@@ -138,8 +119,6 @@ pub fn regex_replace_fn(re: RegexWrapper, s: String, replacement: String, rest: 
     let result = apply_backrefs(&re.0, &s, &replacement, count);
     Ok(Primitive::String(result))
 }
-// string.replace(regex, replacement) -> string
-// string.replace(regex, replacement, count) -> string
 #[yaql_function("replace")]
 pub fn str_replace_regex_fn(s: String, re: RegexWrapper, replacement: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let count = if !rest.0.is_empty() {
@@ -148,9 +127,6 @@ pub fn str_replace_regex_fn(s: String, re: RegexWrapper, replacement: String, re
     let result = apply_backrefs(&re.0, &s, &replacement, count);
     Ok(Primitive::String(result))
 }
-// --- replaceBy (without lambda, only string replacement) ---
-// regex.replaceBy(string, replacement) -> string
-// regex.replaceBy(string, replacement, count) -> string
 #[yaql_function("replaceBy")]
 pub fn regex_replace_by_fn(re: RegexWrapper, s: String, replacement: String, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let count = if !rest.0.is_empty() {
@@ -167,7 +143,6 @@ pub fn str_replace_by_regex_fn(s: String, re: RegexWrapper, replacement: String,
     let result = apply_backrefs(&re.0, &s, &replacement, count);
     Ok(Primitive::String(result))
 }
-// --- replaceBy (lambda: replacement is a lambda called with match object) ---
 #[yaql_function("replaceBy")]
 pub fn regex_replace_by_lambda_fn(re: RegexWrapper, s: String, lambda: LambdaBody, rest: Varargs<0>) -> Result<Primitive, EvalError> {
     let count = if !rest.0.is_empty() {

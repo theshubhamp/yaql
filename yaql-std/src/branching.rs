@@ -95,7 +95,6 @@ pub fn with_fn(args: Varargs<1>) -> Primitive {
 #[yaql_function("memorize")]
 fn memorize(v: Any) -> Primitive { v.0 }
 
-// generateMany: graph traversal
 #[yaql_function("generateMany")]
 pub fn generate_many_fn(start: Any, neighbors: LambdaBody, _rest: Varargs<0>, kwargs: Kwargs) -> Result<Primitive, EvalError> {
     let decycle = kwargs.0.iter().any(|(k, _)| {

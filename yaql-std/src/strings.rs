@@ -64,8 +64,6 @@ fn to_char_array(s: String) -> Vec<Primitive> {
     s.chars().map(|c| Primitive::String(c.to_string())).collect()
 }
 
-// --- split ---
-
 #[yaql_function("split")]
 fn split_whitespace(s: String) -> Vec<Primitive> {
     s.split_whitespace().map(|p| Primitive::String(p.to_string())).collect()
@@ -100,8 +98,6 @@ fn right_split_3(s: String, sep: String, count: i64) -> Vec<Primitive> {
     }
 }
 
-// --- join ---
-
 pub(crate) fn primitive_to_str(p: &Primitive) -> String {
     match p {
         Primitive::String(s) => s.clone(),
@@ -124,8 +120,6 @@ fn join_pythonic(sep: String, arr: Vec<Primitive>) -> String {
     let parts: Vec<String> = arr.iter().map(crate::strings::primitive_to_str).collect();
     parts.join(sep.as_str())
 }
-
-// --- trim ---
 
 #[yaql_function("trim")]
 fn trim_default(s: String) -> String { s.trim().to_string() }
@@ -151,8 +145,6 @@ fn trim_right_chars(s: String, chars: String) -> String {
     s.trim_end_matches(|c| chars.contains(c)).to_string()
 }
 
-// --- norm ---
-
 #[yaql_function("norm")]
 fn norm_str(s: String) -> Option<String> {
     let trimmed = s.trim();
@@ -161,8 +153,6 @@ fn norm_str(s: String) -> Option<String> {
 
 #[yaql_function("norm")]
 fn norm_null(_n: Null) -> Null { Null }
-
-// --- replace ---
 
 #[yaql_function("replace")]
 fn replace_str_3(s: String, old: String, new: String) -> String {
@@ -218,7 +208,6 @@ pub fn replace_dict(s: String, rest: Varargs<0>, kwargs: Kwargs) -> Result<Primi
     }
     Ok(Primitive::String(result))
 }
-// --- substring ---
 
 #[yaql_function("substring")]
 fn substring_2(s: String, start: i64) -> String {
@@ -237,8 +226,6 @@ fn substring_3(s: String, start: i64, length: i64) -> String {
     let end = end.min(len as usize);
     if end < start { String::new() } else { chars[start..end].iter().collect() }
 }
-
-// --- indexOf / lastIndexOf ---
 
 pub(crate) fn norm_start(len: i64, start: i64) -> usize {
     if start < 0 { (len + start).max(0) as usize } else { (start as usize).min(len as usize) }
@@ -335,8 +322,6 @@ fn last_index_of_4(s: String, needle: String, start: i64, end: i64) -> i64 {
         }
     }
 }
-
-// --- startsWith / endsWith with varargs ---
 
 #[yaql_function("startsWith")]
 pub fn starts_with_varargs(s: String, rest: Varargs<1>) -> bool {

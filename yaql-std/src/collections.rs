@@ -230,8 +230,6 @@ fn min_set_default(arr: SetVec, default: Any) -> Primitive {
     crate::collections::min_impl(arr.0)
 }
 
-// --- List mutation ---
-
 pub(crate) fn norm_idx(i: i64, len: usize) -> usize {
     if i < 0 { ((len as i64) + i).max(0) as usize } else { (i as usize).min(len) }
 }

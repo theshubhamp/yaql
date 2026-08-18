@@ -5,8 +5,6 @@ use yaql_core::lang::functions::dispatch;
 use yaql_macros::yaql_function;
 use std::collections::HashMap;
 
-// --- Internal helpers (used by other modules) ---
-
 pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
     match (&left, &right) {
         (Primitive::Map(map), Primitive::String(key)) => map.get(key).cloned().unwrap_or(Primitive::Null),
@@ -17,7 +15,6 @@ pub fn dot_access_impl(left: Primitive, right: Primitive) -> Primitive {
     }
 }
 
-// Used by query.rs `sum` to fold array elements via the "+" semantics.
 pub fn add_primitives(acc: Primitive, e: Primitive) -> Result<Primitive, EvalError> {
     dispatch(
         FUNCTIONS.lookup("+"),
@@ -26,7 +23,6 @@ pub fn add_primitives(acc: Primitive, e: Primitive) -> Result<Primitive, EvalErr
     )
 }
 
-// --- "+" ---
 #[yaql_function("+")]
 fn add_str(l: String, r: String) -> String { format!("{}{}", l, r) }
 
@@ -61,7 +57,6 @@ fn add_int(l: i64, r: i64) -> i64 { l + r }
 #[yaql_function("+")]
 fn add_num(l: Number, r: Number) -> f64 { l.0 + r.0 }
 
-// --- "-" ---
 #[yaql_function("-")]
 fn sub_set(l: SetVec, r: SetVec) -> SetVec {
     SetVec(yaql_core::lang::sets::set_difference(&l.0, &r.0))
@@ -73,7 +68,6 @@ fn sub_int(l: i64, r: i64) -> i64 { l - r }
 #[yaql_function("-")]
 fn sub_num(l: Number, r: Number) -> f64 { l.0 - r.0 }
 
-// --- "*" ---
 #[yaql_function("*")]
 fn mul_str_int(s: String, n: i64) -> String { s.repeat(n as usize) }
 
@@ -96,7 +90,6 @@ fn mul_int(l: i64, r: i64) -> i64 { l * r }
 #[yaql_function("*")]
 fn mul_num(l: Number, r: Number) -> f64 { l.0 * r.0 }
 
-// --- "/" ---
 #[yaql_function("/")]
 pub fn div_int(l: i64, r: i64) -> Result<i64, EvalError> {
     if r == 0 {
@@ -111,7 +104,6 @@ pub fn div_num(l: Number, r: Number) -> Result<f64, EvalError> {
     }
     Ok(l.0 / r.0)
 }
-// --- "mod" ---
 #[yaql_function("mod")]
 fn mod_int(l: i64, r: i64) -> i64 {
     l - r * ((l as f64 / r as f64).floor() as i64)
@@ -122,7 +114,6 @@ fn mod_num(l: Number, r: Number) -> f64 {
     l.0 - r.0 * (l.0 / r.0).floor()
 }
 
-// --- "=" ---
 #[yaql_function("=")]
 fn eq_str(l: String, r: String) -> bool { l == r }
 
@@ -159,11 +150,9 @@ fn eq_map(l: HashMap<String, Primitive>, r: HashMap<String, Primitive>) -> bool 
 #[yaql_function("=")]
 fn eq_any(l: Any, r: Any) -> bool { false }
 
-// --- "!=" ---
 #[yaql_function("!=")]
 fn neq(l: Any, r: Any) -> bool { !yaql_core::lang::primitive_eq(&l.0, &r.0) }
 
-// --- "<" ---
 #[yaql_function("<")]
 fn lt_set(l: SetVec, r: SetVec) -> bool {
     l.0.len() < r.0.len() && yaql_core::lang::sets::is_subset(&l.0, &r.0)
@@ -184,7 +173,6 @@ fn lt_num(l: Number, r: Number) -> bool { l.0 < r.0 }
 #[yaql_function("<")]
 fn lt_any(l: Any, r: Any) -> bool { false }
 
-// --- "<=" ---
 #[yaql_function("<=")]
 fn lteq_set(l: SetVec, r: SetVec) -> bool {
     yaql_core::lang::sets::is_subset(&l.0, &r.0)
@@ -205,7 +193,6 @@ fn lteq_num(l: Number, r: Number) -> bool { l.0 <= r.0 }
 #[yaql_function("<=")]
 fn lteq_any(l: Any, r: Any) -> bool { false }
 
-// --- ">" ---
 #[yaql_function(">")]
 fn gt_set(l: SetVec, r: SetVec) -> bool {
     l.0.len() > r.0.len() && yaql_core::lang::sets::is_subset(&r.0, &l.0)
@@ -226,7 +213,6 @@ fn gt_num(l: Number, r: Number) -> bool { l.0 > r.0 }
 #[yaql_function(">")]
 fn gt_any(l: Any, r: Any) -> bool { false }
 
-// --- ">=" ---
 #[yaql_function(">=")]
 fn gteq_set(l: SetVec, r: SetVec) -> bool {
     yaql_core::lang::sets::is_subset(&r.0, &l.0)
@@ -247,7 +233,6 @@ fn gteq_num(l: Number, r: Number) -> bool { l.0 >= r.0 }
 #[yaql_function(">=")]
 fn gteq_any(l: Any, r: Any) -> bool { false }
 
-// --- "in" ---
 #[yaql_function("in")]
 fn in_str(l: String, r: String) -> bool { r.contains(l.as_str()) }
 
@@ -264,7 +249,6 @@ fn in_set(l: Any, r: SetVec) -> bool {
 #[yaql_function("in")]
 fn in_any(l: Any, r: Any) -> bool { false }
 
-// --- "." ---
 #[yaql_function(".")]
 fn dot_map(l: HashMap<String, Primitive>, r: String) -> Primitive {
     l.get(&r).cloned().unwrap_or(Primitive::Null)
@@ -278,7 +262,6 @@ fn dot_arr(l: Vec<Primitive>, r: String) -> Primitive {
 #[yaql_function(".")]
 fn dot_any(l: Any, r: Any) -> Primitive { Primitive::Null }
 
-// --- "?." (same as "." — interpreter handles the Null check before dispatch) ---
 #[yaql_function("?.")]
 fn dot_map_opt(l: HashMap<String, Primitive>, r: String) -> Primitive {
     l.get(&r).cloned().unwrap_or(Primitive::Null)
@@ -292,11 +275,9 @@ fn dot_arr_opt(l: Vec<Primitive>, r: String) -> Primitive {
 #[yaql_function("?.")]
 fn dot_any_opt(l: Any, r: Any) -> Primitive { Primitive::Null }
 
-// --- "=>" ---
 #[yaql_function("=>")]
 fn mapping_arrow(l: Any, r: Any) -> Primitive { Primitive::Null }
 
-// --- "=~" ---
 #[yaql_function("=~")]
 fn match_regex(s: String, re: RegexWrapper) -> bool {
     re.0.is_match(s.as_str())
@@ -312,7 +293,6 @@ fn match_pattern(s: String, p: String) -> bool {
 #[yaql_function("=~")]
 fn match_any(l: Any, r: Any) -> Primitive { Primitive::Null }
 
-// --- "!~" ---
 #[yaql_function("!~")]
 fn nmatch_regex(s: String, re: RegexWrapper) -> bool {
     !re.0.is_match(s.as_str())
